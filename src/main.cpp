@@ -1,31 +1,25 @@
+#include <math.h>
 #include "macros.h"
 #include "cv.h"
 #include "highgui.h"
 #include "BlobResult.h"
-#include <math.h>
+#include <iostream>
+using namespace std;
+
+#include "thresholds.h"
+#include "geometry.h"
+
 
 #define IMG_WIDTH       (640)
 #define IMG_HEIGHT		(480)
 
-//segmentation #defs
-// hs = [ (0,180), (0,256), (0,256) ]
-#define MAX_BLOBS       (5)
-#define BLOB_SIZE_MIN   (400)
-
-#define BALL_HUE_U		(50)
-#define BALL_HUE_L		(50)
-#define BALL_SAT_U		(50)
-#define BALL_SAT_L		(50)
-
-#define GOAL_HUE_U		(108)
-#define GOAL_HUE_L		(103)
-#define GOAL_SAT_U		(210)
-#define GOAL_SAT_L		(195)
-
-#define VAL_U			(260)
-#define VAL_L			(230)
+#define MAX_BLOBS       (50)
+#define BLOB_SIZE_MIN   (200)
+#define BALL_SIZE_MAX   (250)
+#define BALL_COMPACTNESS (5)
 
 IplImage *img = cvCreateImage(cvSize(IMG_WIDTH, IMG_HEIGHT), 8, 3);
+IplImage *original_img = cvCreateImage(cvSize(IMG_WIDTH, IMG_HEIGHT), 8, 3);
 IplImage *hsv = cvCreateImage(cvSize(IMG_WIDTH, IMG_HEIGHT), 8, 3);
 IplImage *dst = cvCreateImage(cvSize(IMG_WIDTH, IMG_HEIGHT), 8, 1);
 
@@ -37,7 +31,7 @@ void imgTransform(uchar hueU, uchar hueL, uchar satU, uchar satL, uchar valU, uc
 {
 	unsigned int imgstep = 0, dststep = 0, channels = 0;
 	int x = 0, y = 0;
-	cvSmooth(img, img, CV_GAUSSIAN, 5, 5);
+	cvSmooth(original_img, img, CV_GAUSSIAN, 5, 5);
 	cvCvtColor(img, hsv, CV_BGR2HSV);
 	cvZero(dst);
 
@@ -73,19 +67,55 @@ void imgTransform(uchar hueU, uchar hueL, uchar satU, uchar satL, uchar valU, uc
 	}
 };
 
-void extractBlobs()
+void extractBall()
 {
-	blobRes = CBlobResult(dst, NULL, 0);
-	blobRes.Filter( blobRes, B_INCLUDE, CBlobGetArea(), B_GREATER, BLOB_SIZE_MIN );
+    imgTransform(BALL_HUE_U, BALL_HUE_L, BALL_SAT_U, BALL_SAT_L, VAL_U, VAL_L);
 
-	numOfBlobs = blobRes.GetNumBlobs();
+	blobRes = CBlobResult(dst, NULL, 0);
+	blobRes.Filter( blobRes, B_EXCLUDE, CBlobGetArea(), B_LESS, BLOB_SIZE_MIN );// keep blobs larger than BLOB_SIZE_MIN
+	numOfBlobs = blobRes.GetNumBlobs(); cout << numOfBlobs << endl;
+	blobRes.Filter( blobRes, B_EXCLUDE, CBlobGetArea(), B_GREATER, BALL_SIZE_MAX );// keep blobs smaller than BALL_SIZE_MAX
+	numOfBlobs = blobRes.GetNumBlobs(); cout << numOfBlobs << endl;
+	blobRes.Filter( blobRes, B_INCLUDE, CBlobGetCompactness(), B_GREATER, BALL_COMPACTNESS );// keep blobs smaller than BALL_COMPACTNESS
+	numOfBlobs = blobRes.GetNumBlobs(); cout << numOfBlobs << endl;
 
 	for(int i=0; i<numOfBlobs; i++)
 		blobs[i] = blobRes.GetBlob(i);
 };
 
+void extractBots()
+{
+    //RED TEAM
+    imgTransform(TEAM_R_HUE_U, TEAM_R_HUE_L, TEAM_R_SAT_U, TEAM_R_SAT_L, VAL_U, VAL_L);
+	blobRes = CBlobResult(dst, NULL, 0);
+	blobRes.Filter( blobRes, B_EXCLUDE, CBlobGetArea(), B_LESS, BLOB_SIZE_MIN );// keep blobs larger than BLOB_SIZE_MIN
+	numOfBlobs = blobRes.GetNumBlobs(); cout << numOfBlobs << endl;
+    if(numOfBlobs == 2)
+    {
+        for (int i=0; i<2; i++)
+            blobRes.GetBlob(i)
+
+	for(int i=0; i<numOfBlobs; i++)
+		blobs[i] = blobRes.GetBlob(i);
+};
+
+
 void printBlobs()
 {
+
+	CBlobGetXCenter getXC;
+	CBlobGetYCenter getYC;
+    CBlobGetArea    getArea;
+    CBlobGetCompactness getCompactness;
+
+
+	printf("-----Printng Blobs------\n");
+	for(int i=0; i<numOfBlobs; i++)
+	{
+		printf("%d\t(%3.2f,%3.2f),%3.2f %3.2f\n", i, getXC(blobs[i]), getYC(blobs[i]), getArea(blobs[i]), getCompactness(blobs[i]));		
+	}
+	printf("\n");
+
 	cvNamedWindow("old", 1);
 	cvNamedWindow("new", 1);
 	cvMoveWindow("old", 0,0);
@@ -95,22 +125,14 @@ void printBlobs()
 	cvShowImage("new", dst);
 	cvWaitKey();
 
-	CBlobGetXCenter getXC;
-	CBlobGetYCenter getYC;
-
-	printf("-----Printng Blobs------\n");
-	for(int i=0; i<numOfBlobs; i++)
-	{
-		printf("%d\t(%3.2f,%3.2f)\n", i, getXC(blobs[i]), getYC(blobs[i]));		
-	}
-	printf("\n");
 };
 
 int main(void)
 {
-	img = cvLoadImage("./test.jpg");
-    imgTransform(GOAL_HUE_U, GOAL_HUE_L, GOAL_SAT_U, GOAL_SAT_L, VAL_U, VAL_L);
-    extractBlobs();
+	original_img = cvLoadImage("./arena.jpg");
+    extractBots();
+    //extractBall();
+    cout<<"Extracted!";
     printBlobs();
     return 0;
 };
