@@ -17,6 +17,7 @@ CvPoint blueGoalMaskTopLeft, blueGoalMaskBottomRight;
 CvPoint origin;
 // [0] = WHITE, [1] = BLACK for ourBot
 Bot redBot[2], blueBot[2], *opponentBot[2], *ourBot[2];
+int ourColor = RED;                         // initialize this too
 CvPoint blueGoal, redGoal, *ourGoal, *opponentGoal;
 
 CvPoint balls[TOT_BALLS];                   // stores info of all balls
@@ -24,7 +25,7 @@ CvPoint *pballs;                            // pointer to iterate
 int nBallsPresent = TOT_BALLS;
 bool ballCaught = FALSE;
 int closestBallIndex = 0;
-static CvPoint ballPrev[TOT_BALLS] = {cvPoint(0,0)};
+CvPoint ballsPrev[TOT_BALLS] = {cvPoint(0,0)};
 
 // image variables
 IplImage* img;
@@ -49,7 +50,7 @@ void getBots(void)
     blobs = extractBlobs(img, redBot[0].HUE_L, redBot[0].HUE_U, redBot[0].SAT_L, redBot[0].SAT_U);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, redBot[0].AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, redBot[0].AREA_MIN);
-    drawBlobs(blobs, blobs_image, red);
+    drawBlobs(blobs, blobsImg, red);
     
     i = 0;      // blob iter
     j = 0;      // bot iter
@@ -58,7 +59,7 @@ void getBots(void)
         if (dist(redGoal, redBot[j].center) > MIN_GOAL_DIST)
         {
             redBot[j].center = getCenter(blobs.GetBlob(i));
-            printf(locations, "Red Bot (x,y):\t%0.2f\t%0.2f\n", (float)redBot[j].center.x, (float)redBot[j].center.y);
+            printf("Red Bot (x,y):\t%0.2f\t%0.2f\n", (float)redBot[j].center.x, (float)redBot[j].center.y);
             j++;
         }
         i++;
@@ -68,7 +69,7 @@ void getBots(void)
     blobs = extractBlobs(img, blueBot[0].HUE_L, blueBot[0].HUE_U, blueBot[0].SAT_L, blueBot[0].SAT_U);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, blueBot[0].AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, blueBot[0].AREA_MIN);
-    drawBlobs(blobs, blobs_image, blue);
+    drawBlobs(blobs, blobsImg, blue);
     
     i = 0;      // blob iter
     j = 0;      // bot iter
@@ -77,7 +78,7 @@ void getBots(void)
         if (dist(blueGoal, blueBot[j].center) > MIN_GOAL_DIST)
         {
             blueBot[j].center = getCenter(blobs.GetBlob(i));
-            printf(locations, "Blue Bot (x,y):\t%0.2f\t%0.2f\n", (float)blueBot[j].center.x, (float)blueBot[j].center.y);
+            printf("Blue Bot (x,y):\t%0.2f\t%0.2f\n", (float)blueBot[j].center.x, (float)blueBot[j].center.y);
             j++;
         }
         i++;
@@ -95,7 +96,7 @@ void getBots(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_CIRCLE_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_CIRCLE_AREA_MIN);
     blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_GREATER, TAG_CIRCLE_COMPACTNESS_MIN);
-    drawBlobs(blobs, blobs_image, white);
+    drawBlobs(blobs, blobsImg, white);
  
     bGotCircle[RED]  = FALSE;
     bGotCircle[BLUE] = FALSE;
@@ -106,21 +107,37 @@ void getBots(void)
         {
             redBot[0].circleCenter = whiteTemp;
             bGotCircle[RED] = TRUE;
+            if(ourColor == RED)
+                ourBot[WHITE] = &redBot[0];
+            else
+                opponentBot[WHITE] = &redBot[0];
         }
         else if (dist(redBot[1].center, whiteTemp) < CIRCLE_BOT_DIST)
         {
             redBot[1].circleCenter = whiteTemp;
             bGotCircle[RED] = TRUE;
+            if(ourColor == RED)
+                ourBot[WHITE] = &redBot[1];
+            else
+                opponentBot[WHITE] = &redBot[1];
         }
         else if (dist(blueBot[0].center, whiteTemp) < CIRCLE_BOT_DIST)
         {
             blueBot[0].circleCenter = whiteTemp;
             bGotCircle[BLUE] = TRUE;
+            if(ourColor == BLUE)
+                ourBot[WHITE] = &blueBot[0];
+            else
+                opponentBot[WHITE] = &blueBot[0];
         }
         else if (dist(blueBot[1].center, whiteTemp) < CIRCLE_BOT_DIST)
         {
             blueBot[1].circleCenter = whiteTemp;
             bGotCircle[BLUE] = TRUE;
+            if(ourColor == BLUE)
+                ourBot[WHITE] = &blueBot[1];
+            else
+                opponentBot[WHITE] = &blueBot[1];
         }
 
         if(bGotCircle[RED] && bGotCircle[BLUE])
@@ -132,7 +149,7 @@ void getBots(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_RECT_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_RECT_AREA_MIN);
     blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, TAG_RECT_COMPACTNESS_MAX);
-    drawBlobs(blobs, blobs_image, white);
+    drawBlobs(blobs, blobsImg, white);
  
     bGotRect[RED]  = FALSE;
     bGotRect[BLUE] = FALSE;
@@ -173,7 +190,7 @@ void getBots(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_CIRCLE_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_CIRCLE_AREA_MIN);
     blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_GREATER, TAG_CIRCLE_COMPACTNESS_MIN);
-    drawBlobs(blobs, blobs_image, white);
+    drawBlobs(blobs, blobsImg, white);
  
     bGotCircle[RED]  = FALSE;
     bGotCircle[BLUE] = FALSE;
@@ -184,21 +201,37 @@ void getBots(void)
         {
             redBot[0].circleCenter = blackTemp;
             bGotCircle[RED] = TRUE;
+            if(ourColor == RED)
+                ourBot[BLACK] = &redBot[0];
+            else
+                opponentBot[BLACK] = &redBot[0];
         }
         else if (dist(redBot[1].center, blackTemp) < CIRCLE_BOT_DIST)
         {
             redBot[1].circleCenter = blackTemp;
             bGotCircle[RED] = TRUE;
+            if(ourColor == RED)
+                ourBot[BLACK] = &redBot[1];
+            else
+                opponentBot[BLACK] = &redBot[1];
         }
         else if (dist(blueBot[0].center, blackTemp) < CIRCLE_BOT_DIST)
         {
             blueBot[0].circleCenter = blackTemp;
             bGotCircle[BLUE] = TRUE;
+            if(ourColor == BLUE)
+                ourBot[BLACK] = &blueBot[0];
+            else
+                opponentBot[BLACK] = &blueBot[0];
         }
         else if (dist(blueBot[1].center, blackTemp) < CIRCLE_BOT_DIST)
         {
             blueBot[1].circleCenter = blackTemp;
             bGotCircle[BLUE] = TRUE;
+            if(ourColor == BLUE)
+                ourBot[BLACK] = &blueBot[1];
+            else
+                opponentBot[BLACK] = &blueBot[1];
         }
 
         if(bGotCircle[RED] && bGotCircle[BLUE])
@@ -210,7 +243,7 @@ void getBots(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_RECT_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_RECT_AREA_MIN);
     blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, TAG_RECT_COMPACTNESS_MAX);
-    drawBlobs(blobs, blobs_image, white);
+    drawBlobs(blobs, blobsImg, white);
  
     bGotRect[RED]  = FALSE;
     bGotRect[BLUE] = FALSE;
@@ -242,24 +275,12 @@ void getBots(void)
             break;
     }
     //--------------------------------------------------------------------------
-       
-    // If both tags found, use the tag centers to update bot center
-    if(bGotWhiteTag[RED] && bGotWhiteTag[RED])
+    
+    for(i=0; i<2; i++)
     {
-        redBot.center.x = (redBot.blackCircleCenter.x + redBot.whiteCircleCenter.x)/2;
-        redBot.center.y = (redBot.blackCircleCenter.y + redBot.whiteCircleCenter.y)/2;
+        ourBot[i]->angle = angleOfBot(ourBot[i]);
+        opponentBot[i]->angle = angleOfBot(opponentBot[i]);
     }
-    if(bGotWhiteTag[BLUE] && bGotWhiteTag[BLUE])
-    {
-        blueBot.center.x = (blueBot.blackCircleCenter.x + blueBot.whiteCircleCenter.x)/2;
-        blueBot.center.y = (blueBot.blackCircleCenter.y + blueBot.whiteCircleCenter.y)/2;
-    }
-    // Store bot angles, useful later
-    redBot.angle = angleOfBot(redBot);
-    blueBot.angle = angleOfBot(blueBot);
-
-    //fprintf(locations, "Red Bot Angle:\t%0.2f\nBlue Bot Angle:\t%0.2f\n", angleOfBot(redBot), angleOfBot(blueBot));
-
     return;
 }
 
@@ -283,7 +304,7 @@ void getBalls(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, BALL_AREA_MIN);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetCompactness(), B_GREATER, BALL_COMPACTNESS_MAX);
     // blobs.Filter(blobs, B_EXCLUDE, CBlobGetMean(), B_LESS, 200);
-    drawBlobs(blobs, blobs_img, orange);
+    drawBlobs(blobs, blobsImg, orange);
     nBallsDetectedAvg += blobs.GetNumBlobs();
     
     for(i=0; i<TOT_BALLS; i++)
@@ -306,8 +327,7 @@ void getBalls(void)
 
     frameCount++;
     if((nBallsPresent == 0) && (ballCaught == FALSE) )
-        printf(locations,"Balls Over\n");
-    //fprintf(locations,"%d\tYellow Balls\n%d\tOrange Balls\n",nBallsPresent[YELLOW],nBallsPresent[ORANGE]);
+        printf("Balls Over\n");
     return;
 }
 
@@ -315,9 +335,10 @@ void getGoals(void)
 {
     CBlobResult blobs;
     CBlob blob;
+    CBlobGetMean mean;
     
     // Red Goal
-    blobs = extractBlobs(img, GOAL_R_HUEL, GOAL_R_HUEU, GOAL_R_SAT_L, GOAL_R_SAT_U);
+    blobs = extractBlobs(img, GOAL_R_HUE_L, GOAL_R_HUE_U, GOAL_R_SAT_L, GOAL_R_SAT_U);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, GOAL_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, GOAL_AREA_MIN);
     blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, GOAL_COMPACTNESS_MAX);
@@ -325,14 +346,14 @@ void getGoals(void)
     // if the bot color also comes up due to bad thresholds, we need to choose the right most blob
     if((blobs.GetNumBlobs() == 1) || (blobs.GetNumBlobs() == 2) )
     {
-        drawBlobs(blobs, blobs_img, red);
+        drawBlobs(blobs, blobsImg, red);
         if (blobs.GetNumBlobs() == 1)
         {
             blob = blobs.GetBlob(0);
         }
         else if(blobs.GetNumBlobs() == 2)
         {
-            if(blobs.GetBlob(0)->SumX() > blobs.GetBlob(1)->SumX()) // whichever is rightmost
+            if( mean(blobs.GetBlob(0)) > mean(blobs.GetBlob(1)) ) // whichever is rightmost
                 blob = blobs.GetBlob(0);
             else
                 blob = blobs.GetBlob(1);
@@ -345,7 +366,7 @@ void getGoals(void)
     }
     
     // Blue Goal
-    blobs = extractBlobs(img, GOAL_B_HUEL, GOAL_B_HUEU, GOAL_B_SAT_L, GOAL_B_SAT_U);
+    blobs = extractBlobs(img, GOAL_B_HUE_L, GOAL_B_HUE_U, GOAL_B_SAT_L, GOAL_B_SAT_U);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, GOAL_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, GOAL_AREA_MIN);
     blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, GOAL_COMPACTNESS_MAX);
@@ -353,7 +374,7 @@ void getGoals(void)
     // if the bot color also comes up due to bad thresholds, we need to choose the right most blob
     if((blobs.GetNumBlobs() == 1) || (blobs.GetNumBlobs() == 2) )
     {
-        drawBlobs(blobs, blobs_img, blue);
+        drawBlobs(blobs, blobsImg, blue);
         if (blobs.GetNumBlobs() == 1)
         {
             blob = blobs.GetBlob(0);
@@ -410,7 +431,7 @@ CBlobResult extractBlobs(IplImage* img, uchar hueL, uchar hueU, uchar satL, ucha
             }
         }
     }
-    blobs = CBlobResult(dst, NULL, 100, true);
+    blobs = CBlobResult(dst, NULL, 100);
     return blobs;
 }
 
@@ -418,3 +439,14 @@ inline CvPoint getCenter(CBlob blob)
 {
     return cvPoint((int)(blob.SumX()), (int)(blob.SumY()));
 }
+
+inline float angleOfBot(Bot* bot)
+{
+    return (float)(180 / (CV_PI) * atan2((float)(bot->circleCenter.y - bot->rectCenter.y), (float)(bot->circleCenter.x - bot->rectCenter.x)));
+}
+
+inline float dist(CvPoint p1, CvPoint p2)
+{
+    return sqrt((float)((p1.x - p2.x)*(p1.x - p2.x) + (p1.y - p2.y)*(p1.y - p2.y)));
+}
+

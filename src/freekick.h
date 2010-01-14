@@ -22,6 +22,11 @@ using namespace std;
 #define IMAGE_WIDTH     (640)
 #define IMAGE_HEIGHT    (480)
 
+#define MIN_GOAL_DIST                   (10)
+#define CIRCLE_BOT_DIST                 (40)
+#define BALL_DETECTION_FRAMES_TO_AVG    (15)
+#define MIN_BALL_DIST                   (30)
+#define OUR_INF                         (IMAGE_WIDTH*10)
 
 enum
 {
@@ -59,6 +64,8 @@ void drawBlobs(CBlobResult blobs, IplImage* img, CvScalar color);
 CBlobResult extractBlobs(IplImage *img, uchar hueL, uchar hueU, uchar satL, uchar satU, uchar valL = VAL_L, uchar valU = VAL_U);
 
 inline CvPoint getCenter(CBlob blob);
+inline float angleOfBot(Bot* bot);
+inline float dist(CvPoint p1, CvPoint p2);
 
 // Serial Port functions
 extern "C"
