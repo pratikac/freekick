@@ -14,9 +14,6 @@ using namespace std;
 #define IMG_HEIGHT		(480)
 
 #define MAX_BLOBS       (50)
-#define BLOB_SIZE_MIN   (200)
-#define BALL_SIZE_MAX   (250)
-#define BALL_COMPACTNESS (5)
 
 IplImage *img = cvCreateImage(cvSize(IMG_WIDTH, IMG_HEIGHT), 8, 3);
 IplImage *original_img = cvCreateImage(cvSize(IMG_WIDTH, IMG_HEIGHT), 8, 3);
@@ -27,7 +24,7 @@ CBlob blobs[MAX_BLOBS];
 CBlobResult blobRes;
 int numOfBlobs = 0;
 
-void imgTransform(uchar hueU, uchar hueL, uchar satU, uchar satL, uchar valU, uchar valL)
+CBlobResult imgTransform(IplImage *img, uchar hueU, uchar hueL, uchar satU, uchar satL, uchar valU, uchar valL)
 {
 	unsigned int imgstep = 0, dststep = 0, channels = 0;
 	int x = 0, y = 0;
@@ -65,6 +62,9 @@ void imgTransform(uchar hueU, uchar hueL, uchar satU, uchar satL, uchar valU, uc
 			}
 		}
 	}
+    
+    blobs = CBlobResult(dst, NULL, 100, true);
+    return blobs;
 };
 
 void extractBall()
@@ -76,7 +76,7 @@ void extractBall()
 	numOfBlobs = blobRes.GetNumBlobs(); cout << numOfBlobs << endl;
 	blobRes.Filter( blobRes, B_EXCLUDE, CBlobGetArea(), B_GREATER, BALL_SIZE_MAX );// keep blobs smaller than BALL_SIZE_MAX
 	numOfBlobs = blobRes.GetNumBlobs(); cout << numOfBlobs << endl;
-	blobRes.Filter( blobRes, B_INCLUDE, CBlobGetCompactness(), B_GREATER, BALL_COMPACTNESS );// keep blobs smaller than BALL_COMPACTNESS
+	blobRes.Filter( blobRes, B_INCLUDE, CBlobGetCompactness(), B_GREATER, BALL_COMPACTNESS );// keep blobs greater than BALL_COMPACTNESS
 	numOfBlobs = blobRes.GetNumBlobs(); cout << numOfBlobs << endl;
 
 	for(int i=0; i<numOfBlobs; i++)

@@ -45,7 +45,4 @@
 #define DEE_LEFT_SOUTH_X (-600)
 #define DEE_LEFT_SOUTH_Y (-450) 
 
-
-typedef pair<float,float> point;
-
 # endif

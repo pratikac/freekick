@@ -3,7 +3,7 @@ CPP = g++.exe
 
 BIN = ../bin/freekick.exe
 C_SRCS = 
-CPP_SRCS = main.cpp
+CPP_SRCS = freekick.cpp
 
 C_OBJS = $(C_SRCS:.c=.o)
 CPP_OBJS = $(CPP_SRCS:.cpp=.o)
