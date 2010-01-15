@@ -37,6 +37,12 @@ IplImage* dst = cvCreateImage(cvSize(IMAGE_WIDTH, IMAGE_HEIGHT), 8, 1);
 // serial port handler
 HANDLE serialPort;
 
+int main()
+{
+    return 0;
+}
+
+
 void getBots(void)
 {
     CBlobResult blobs;
@@ -335,7 +341,6 @@ void getGoals(void)
 {
     CBlobResult blobs;
     CBlob blob;
-    CBlobGetMean mean;
     
     // Red Goal
     blobs = extractBlobs(img, GOAL_R_HUE_L, GOAL_R_HUE_U, GOAL_R_SAT_L, GOAL_R_SAT_U);
@@ -353,7 +358,7 @@ void getGoals(void)
         }
         else if(blobs.GetNumBlobs() == 2)
         {
-            if( mean(blobs.GetBlob(0)) > mean(blobs.GetBlob(1)) ) // whichever is rightmost
+            if(blobs.GetBlob(0)->SumX() > blobs.GetBlob(1)->SumX()) // whichever is rightmost
                 blob = blobs.GetBlob(0);
             else
                 blob = blobs.GetBlob(1);
@@ -395,6 +400,19 @@ void getGoals(void)
     return;
 }
 
+void drawBlobs(CBlobResult blobs, IplImage* img, CvScalar color)
+{
+    CBlob blob;
+    CvPoint point;
+    for (int x = 0; x < blobs.GetNumBlobs(); x++)
+    {
+        blob = blobs.GetBlob(x);
+        point = cvPoint((int)(blob.SumX()), (int)(blob.SumY()));
+        blob.FillBlob(img, color);
+        cvCircle(img, point, 2, white, -1);
+    }
+}
+
 CBlobResult extractBlobs(IplImage* img, uchar hueL, uchar hueU, uchar satL, uchar satU, uchar valL, uchar valU)
 {
     unsigned int imgstep = 0, dststep = 0, channels = 0;
@@ -431,7 +449,7 @@ CBlobResult extractBlobs(IplImage* img, uchar hueL, uchar hueU, uchar satL, ucha
             }
         }
     }
-    blobs = CBlobResult(dst, NULL, 100);
+    blobs = CBlobResult(dst, NULL, true);
     return blobs;
 }
 
