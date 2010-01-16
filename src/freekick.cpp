@@ -40,7 +40,16 @@ HANDLE serialPort;
 int main()
 {
     image = cvLoadImage("arena.jpg");
-    getGoals();
+    getBots();
+	
+    cvNamedWindow("old", 1);
+	cvNamedWindow("new", 1);
+	cvMoveWindow("old", 0,0);
+	cvMoveWindow("new", 0,400);
+
+	cvShowImage("old", image);
+	cvShowImage("new", dst);
+	cvWaitKey();
 
     return 0;
 }
@@ -56,41 +65,31 @@ void getBots(void)
     int i,j;
 
     // Red Bot
-    blobs = extractBlobs(image, redBot[0].HUE_L, redBot[0].HUE_U, redBot[0].SAT_L, redBot[0].SAT_U);
-    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, redBot[0].AREA_MAX);
-    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, redBot[0].AREA_MIN);
-    drawBlobs(blobs, blobsImg, red);
-    
-    i = 0;      // blob iter
-    j = 0;      // bot iter
-    while( (i < blobs.GetNumBlobs()) && (j < 2))
+    blobs = extractBlobs(image, TEAM_R_HUE_L, TEAM_R_HUE_U, TEAM_R_SAT_L, TEAM_R_SAT_U);
+    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, BOT_AREA_MAX);
+    //cout<<"numofBlobs1 : "<<blobs.GetNumBlobs()<<endl;
+    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, BOT_AREA_MIN);
+    //cout<<"numofBlobs2 : "<<blobs.GetNumBlobs()<<endl;
+    //drawBlobs(blobs, blobsImg, red);
+
+    for(i=0; i < blobs.GetNumBlobs(); i++)
     {
-        if (dist(redGoal, redBot[j].center) > MIN_GOAL_DIST)
-        {
-            redBot[j].center = getCenter(blobs.GetBlob(i));
-            printf("Red Bot (x,y):\t%0.2f\t%0.2f\n", (float)redBot[j].center.x, (float)redBot[j].center.y);
-            j++;
-        }
-        i++;
+        redBot[i].center = getCenter(blobs.GetBlob(i));
+        printf("Red Bot (x,y):\t%0.2f\t%0.2f\n", (float)redBot[i].center.x, (float)redBot[i].center.y);
     }
 
     // Blue Bot
-    blobs = extractBlobs(image, blueBot[0].HUE_L, blueBot[0].HUE_U, blueBot[0].SAT_L, blueBot[0].SAT_U);
-    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, blueBot[0].AREA_MAX);
-    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, blueBot[0].AREA_MIN);
-    drawBlobs(blobs, blobsImg, blue);
-    
-    i = 0;      // blob iter
-    j = 0;      // bot iter
-    while( (i < blobs.GetNumBlobs()) && (j < 2))
+    blobs = extractBlobs(image, TEAM_B_HUE_L, TEAM_B_HUE_U, TEAM_B_SAT_L, TEAM_B_SAT_U);
+    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, BOT_AREA_MAX);
+    //cout<<"numofBlobs1 : "<<blobs.GetNumBlobs()<<endl;
+    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, BOT_AREA_MIN);
+    //cout<<"numofBlobs1 : "<<blobs.GetNumBlobs()<<endl;
+    //drawBlobs(blobs, blobsImg, blue);
+
+    for(i=0; i < blobs.GetNumBlobs(); i++)
     {
-        if (dist(blueGoal, blueBot[j].center) > MIN_GOAL_DIST)
-        {
-            blueBot[j].center = getCenter(blobs.GetBlob(i));
-            printf("Blue Bot (x,y):\t%0.2f\t%0.2f\n", (float)blueBot[j].center.x, (float)blueBot[j].center.y);
-            j++;
-        }
-        i++;
+        blueBot[i].center = getCenter(blobs.GetBlob(i));
+        printf("Blue Bot (x,y):\t%0.2f\t%0.2f\n", (float)blueBot[i].center.x, (float)blueBot[i].center.y);
     }
 
     // depending upon the segmentation of tags, change the *ourBot pointers to point to redBot[0] or redBot[1]
@@ -98,14 +97,15 @@ void getBots(void)
 
     //---------------------------------------------------------------------------------------------------
     // White Tags
-    blobs = extractBlobs(image, 0, 255, TAG_W_SAT_L, TAG_W_SAT_U, TAG_W_VAL_L, TAG_W_VAL_U);
-
-    // Cirlces
+    blobs = extractBlobs(image, TAG_W_HUE_L, TAG_W_HUE_U, TAG_W_SAT_L, TAG_W_SAT_U, TAG_W_VAL_L, TAG_W_VAL_U);
+    
+    // Circles
     blobsTemp = blobs;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_CIRCLE_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_CIRCLE_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_GREATER, TAG_CIRCLE_COMPACTNESS_MIN);
-    drawBlobs(blobs, blobsImg, white);
+    //drawBlobs(blobs, blobsImg, white);
+    printBlobArea(blobs);
  
     bGotCircle[RED]  = FALSE;
     bGotCircle[BLUE] = FALSE;
@@ -152,13 +152,14 @@ void getBots(void)
         if(bGotCircle[RED] && bGotCircle[BLUE])
             break;
     }
-  
+    
+    /*
     // Rect
     blobs = blobsTemp;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_RECT_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_RECT_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, TAG_RECT_COMPACTNESS_MAX);
-    drawBlobs(blobs, blobsImg, white);
+    //drawBlobs(blobs, blobsImg, white);
  
     bGotRect[RED]  = FALSE;
     bGotRect[BLUE] = FALSE;
@@ -189,17 +190,18 @@ void getBots(void)
         if(bGotRect[RED] && bGotRect[BLUE])
             break;
     }
+    */
     //-----------------------------------------------------------------------------------------
 
     // Black Tags
-    blobs = extractBlobs(image, 0, 255, TAG_B_SAT_L, TAG_B_SAT_U, TAG_B_VAL_L, TAG_B_VAL_U);
+    blobs = extractBlobs(image, TAG_B_HUE_L, TAG_B_HUE_U, TAG_B_SAT_L, TAG_B_SAT_U, TAG_B_VAL_L, TAG_B_VAL_U);
 
     // Cirlces
     blobsTemp = blobs;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_CIRCLE_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_CIRCLE_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_GREATER, TAG_CIRCLE_COMPACTNESS_MIN);
-    drawBlobs(blobs, blobsImg, white);
+    //drawBlobs(blobs, blobsImg, white);
  
     bGotCircle[RED]  = FALSE;
     bGotCircle[BLUE] = FALSE;
@@ -246,7 +248,8 @@ void getBots(void)
         if(bGotCircle[RED] && bGotCircle[BLUE])
             break;
     }
-  
+    
+    /*
     // Rect
     blobs = blobsTemp;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_RECT_AREA_MAX);
@@ -284,59 +287,50 @@ void getBots(void)
             break;
     }
     //--------------------------------------------------------------------------
-    
+    */
+
     for(i=0; i<2; i++)
     {
         ourBot[i]->angle = angleOfBot(ourBot[i]);
         opponentBot[i]->angle = angleOfBot(opponentBot[i]);
     }
+    printBotParams();
     return;
 }
 
 void getBalls(void)
 {
     CBlobResult blobs;
-    static unsigned int frameCount = 0;
-    static float nBallsDetectedAvg = 0;
-
-    int i=0;
-
-    if(frameCount == BALL_DETECTION_FRAMES_TO_AVG)
-    {
-        nBallsPresent = ceil(nBallsDetectedAvg / BALL_DETECTION_FRAMES_TO_AVG);
-        nBallsDetectedAvg = 0;
-        frameCount = 0;
-    }
-
+	
     blobs = extractBlobs(image, BALL_HUE_L, BALL_HUE_U, BALL_SAT_L, BALL_SAT_U);
-    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, BALL_AREA_MAX);
-    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, BALL_AREA_MIN);
-    //blobs.Filter(blobs, B_EXCLUDE, CBlobGetCompactness(), B_GREATER, BALL_COMPACTNESS_MAX);
-    // blobs.Filter(blobs, B_EXCLUDE, CBlobGetMean(), B_LESS, 200);
-    drawBlobs(blobs, blobsImg, orange);
-    nBallsDetectedAvg += blobs.GetNumBlobs();
     
-    for(i=0; i<TOT_BALLS; i++)
+    nBallsPresent = blobs.GetNumBlobs();
+    
+    //printBlobArea(blobs);
+
+    blobs.Filter(blobs, B_INCLUDE, CBlobGetArea(), B_GREATER, BALL_AREA_MIN);
+    nBallsPresent = blobs.GetNumBlobs();
+    blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, BALL_AREA_MAX);
+    //blobs.Filter(blobs, B_EXCLUDE, CBlobGetCompactness(), B_GREATER, BALL_COMPACTNESS_MIN);
+    // blobs.Filter(blobs, B_EXCLUDE, CBlobGetMean(), B_LESS, 200);
+    //drawBlobs(blobs, blobsImg, orange);
+    nBallsPresent = blobs.GetNumBlobs();
+    
+    for(int i=0; i<TOT_BALLS; i++)
     {
         if(i < nBallsPresent)
         {
             // Update the locations of only those balls present
-            if( i < blobs.GetNumBlobs() )
-            {
-                balls[i] = getCenter(blobs.GetBlob(i));
-                ballsPrev[i] = balls[i];
-                //fprintf(locations, "Yellow Ball No.%d\t%d\t%d\n", i+1,yellowBalls[i].x,yellowBalls[i].y);
-            }
-            else
-                balls[i] = ballsPrev[i];
+            balls[i] = getCenter(blobs.GetBlob(i));
+            //ballsPrev[i] = balls[i];
         }
         else
             balls[i] = cvPoint(OUR_INF, OUR_INF);
     }
 
-    frameCount++;
     if((nBallsPresent == 0) && (ballCaught == FALSE) )
         printf("Balls Over\n");
+    
     return;
 }
 
@@ -473,7 +467,7 @@ inline CvPoint getCenter(CBlob blob)
 
 inline float angleOfBot(Bot* bot)
 {
-    return (float)(180 / (CV_PI) * atan2((float)(bot->circleCenter.y - bot->center.y), (float)(bot->circleCenter.x - bot->center.x)));
+    return (float)(180 / (CV_PI) * atan2((float)(bot->center.y - bot->circleCenter.y), (float)(bot->circleCenter.x - bot->center.x)));
 }
 
 inline float dist(CvPoint p1, CvPoint p2)
@@ -481,3 +475,25 @@ inline float dist(CvPoint p1, CvPoint p2)
     return sqrt((float)((p1.x - p2.x)*(p1.x - p2.x) + (p1.y - p2.y)*(p1.y - p2.y)));
 }
 
+void printBlobArea(CBlobResult blob)
+{
+    CBlobGetXCenter getXC;
+	CBlobGetYCenter getYC;
+    CBlobGetArea    getArea;
+    CBlob tempBlob;
+	
+    for(int i=0; i<blob.GetNumBlobs(); i++)
+	{
+        tempBlob = blob.GetBlob(i);
+		printf("%d\t(%3.2f,%3.2f),%3.2f \n", i, getXC(tempBlob), getYC(tempBlob), getArea(tempBlob));		
+	}
+	printf("\n");
+}
+
+void printBotParams()
+{
+    for(int i=0; i<2; i++)
+        cout<<"Red: "<<i<<" x: "<<redBot[i].center.x<<" y: "<<redBot[i].center.y<<" angle: "<<redBot[i].angle<<endl;
+    for(int i=0; i<2; i++)
+        cout<<"Blue: "<<i<<" x: "<<blueBot[i].center.x<<" y: "<<blueBot[i].center.y<<" angle: "<<blueBot[i].angle<<endl;
+}

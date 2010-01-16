@@ -24,9 +24,11 @@ using namespace std;
 
 #define MIN_GOAL_DIST                   (10)
 #define CIRCLE_BOT_DIST                 (40)
-#define BALL_DETECTION_FRAMES_TO_AVG    (15)
+#define BALL_DETECTION_FRAMES_TO_AVG    (1)
 #define MIN_BALL_DIST                   (30)
 #define OUR_INF                         (IMAGE_WIDTH*10)
+
+
 
 enum
 {
@@ -45,14 +47,6 @@ typedef struct Bot
     float angle;
     CvPoint circleCenter;
     CvPoint rectCenter;
-    unsigned char HUE_L;
-    unsigned char HUE_U;
-    unsigned char SAT_L;
-    unsigned char SAT_U;
-    unsigned int AREA_MIN;
-    unsigned int AREA_MAX;
-    unsigned int COMPACTNESS_MIN;
-    unsigned int COMPACTNESS_MAX;
 }
 Bot;
 
@@ -66,6 +60,8 @@ CBlobResult extractBlobs(IplImage *img, uchar hueL, uchar hueU, uchar satL, ucha
 inline CvPoint getCenter(CBlob blob);
 inline float angleOfBot(Bot* bot);
 inline float dist(CvPoint p1, CvPoint p2);
+void printBlobArea(CBlobResult blob);
+void printBotParams();
 
 // Serial Port functions
 extern "C"
