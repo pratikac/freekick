@@ -7,10 +7,10 @@
 #include <windows.h>
 #include <time.h>
 #include "macros.h"
-#include "cv.h"
-#include "highgui.h"
-#include "BlobResult.h"
-#include "videoInput.h"
+#include <cv.h>
+#include <highgui.h>
+#include <BlobResult.h>
+#include <videoInput.h>
 using namespace std;
 
 #include "thresholds.h"

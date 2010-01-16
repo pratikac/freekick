@@ -449,7 +449,7 @@ CBlobResult extractBlobs(IplImage* img, uchar hueL, uchar hueU, uchar satL, ucha
             }
         }
     }
-    blobs = CBlobResult(dst, NULL, true);
+    blobs = CBlobResult(dst, NULL, 100, true);
     return blobs;
 }
 
