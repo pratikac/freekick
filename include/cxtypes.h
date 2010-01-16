@@ -7,10 +7,11 @@
 //  copy or use the software.
 //
 //
-//                        Intel License Agreement
+//                          License Agreement
 //                For Open Source Computer Vision Library
 //
-// Copyright (C) 2000, Intel Corporation, all rights reserved.
+// Copyright (C) 2000-2008, Intel Corporation, all rights reserved.
+// Copyright (C) 2009, Willow Garage Inc., all rights reserved.
 // Third party copyrights are property of their respective owners.
 //
 // Redistribution and use in source and binary forms, with or without modification,
@@ -23,7 +24,7 @@
 //     this list of conditions and the following disclaimer in the documentation
 //     and/or other materials provided with the distribution.
 //
-//   * The name of Intel Corporation may not be used to endorse or promote products
+//   * The name of the copyright holders may not be used to endorse or promote products
 //     derived from this software without specific prior written permission.
 //
 // This software is provided by the copyright holders and contributors "as is" and
@@ -69,6 +70,10 @@
     #define CV_SSE2 1
   #else
     #define CV_SSE2 0
+  #endif
+
+  #if ((defined __SSE__ || defined __MMX__) && defined __GNUC__ && __GNUC__ >= 3)
+    #include <mmintrin.h>
   #endif
 
   #if defined __BORLANDC__
@@ -121,14 +126,14 @@
 #ifndef CV_INLINE
 #if defined __cplusplus
     #define CV_INLINE inline
-#elif (defined WIN32 || defined WIN64) && !defined __GNUC__
+#elif (defined WIN32 || defined WIN64 || defined WINCE) && !defined __GNUC__
     #define CV_INLINE __inline
 #else
     #define CV_INLINE static
 #endif
 #endif /* CV_INLINE */
 
-#if (defined WIN32 || defined WIN64) && defined CVAPI_EXPORTS
+#if (defined WIN32 || defined WIN64 || defined WINCE) && defined CVAPI_EXPORTS
     #define CV_EXPORTS __declspec(dllexport)
 #else
     #define CV_EXPORTS
@@ -310,7 +315,7 @@ CV_INLINE CvRNG cvRNG( int64 seed CV_DEFAULT(-1))
 CV_INLINE unsigned cvRandInt( CvRNG* rng )
 {
     uint64 temp = *rng;
-    temp = (uint64)(unsigned)temp*1554115554 + (temp >> 32);
+    temp = (uint64)(unsigned)temp*4164903690U + (temp >> 32);
     *rng = temp;
     return (unsigned)temp;
 }

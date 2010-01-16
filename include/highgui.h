@@ -196,8 +196,21 @@ CVAPI(void) cvSetMouseCallback( const char* window_name, CvMouseCallback on_mous
 CVAPI(IplImage*) cvLoadImage( const char* filename, int iscolor CV_DEFAULT(CV_LOAD_IMAGE_COLOR));
 CVAPI(CvMat*) cvLoadImageM( const char* filename, int iscolor CV_DEFAULT(CV_LOAD_IMAGE_COLOR));
 
+#define CV_IMWRITE_JPEG_QUALITY 1
+#define CV_IMWRITE_PNG_COMPRESSION 16
+#define CV_IMWRITE_PXM_BINARY 32
+
 /* save image to file */
-CVAPI(int) cvSaveImage( const char* filename, const CvArr* image );
+CVAPI(int) cvSaveImage( const char* filename, const CvArr* image,
+                        const int* params CV_DEFAULT(0) );
+
+/* decode image stored in the buffer */
+CVAPI(IplImage*) cvDecodeImage( const CvMat* buf, int iscolor CV_DEFAULT(CV_LOAD_IMAGE_COLOR));
+CVAPI(CvMat*) cvDecodeImageM( const CvMat* buf, int iscolor CV_DEFAULT(CV_LOAD_IMAGE_COLOR));
+
+/* encode image and store the result as a byte vector (single-row 8uC1 matrix) */
+CVAPI(CvMat*) cvEncodeImage( const char* ext, const CvArr* image,
+                             const int* params CV_DEFAULT(0) );
 
 #define CV_CVTIMG_FLIP      1
 #define CV_CVTIMG_SWAP_RB   2
@@ -256,7 +269,7 @@ CVAPI(int) cvGrabFrame( CvCapture* capture );
   This function may apply some frame processing like
   frame decompression, flipping etc.
   !!!DO NOT RELEASE or MODIFY the retrieved frame!!! */
-CVAPI(IplImage*) cvRetrieveFrame( CvCapture* capture );
+CVAPI(IplImage*) cvRetrieveFrame( CvCapture* capture, int streamIdx CV_DEFAULT(0) );
 
 /* Just a combination of cvGrabFrame and cvRetrieveFrame
    !!!DO NOT RELEASE or MODIFY the retrieved frame!!!      */
@@ -280,8 +293,10 @@ CVAPI(void) cvReleaseCapture( CvCapture** capture );
 #define CV_CAP_PROP_SATURATION    12
 #define CV_CAP_PROP_HUE           13
 #define CV_CAP_PROP_GAIN          14
-#define CV_CAP_PROP_CONVERT_RGB   15
-
+#define CV_CAP_PROP_EXPOSURE      15
+#define CV_CAP_PROP_CONVERT_RGB   16
+#define CV_CAP_PROP_WHITE_BALANCE 17
+#define CV_CAP_PROP_RECTIFICATION 18
 
 /* retrieve or set capture properties */
 CVAPI(double) cvGetCaptureProperty( CvCapture* capture, int property_id );
@@ -290,11 +305,16 @@ CVAPI(int)    cvSetCaptureProperty( CvCapture* capture, int property_id, double 
 /* "black box" video file writer structure */
 typedef struct CvVideoWriter CvVideoWriter;
 
+#ifndef SWIG
 #define CV_FOURCC(c1,c2,c3,c4)  \
     (((c1)&255) + (((c2)&255)<<8) + (((c3)&255)<<16) + (((c4)&255)<<24))
+#else
+  // Prototype for CV_FOURCC so that swig can generate wrapper without mixing up the define
+  int CV_FOURCC(char c1, char c2, char c3, char c4);
+#endif
 
 #define CV_FOURCC_PROMPT -1  /* Open Codec Selection Dialog (Windows only) */
-#define CV_FOURCC_DEFAULT -1 /* Use default codec for specified filename (Linux only) */
+#define CV_FOURCC_DEFAULT CV_FOURCC('I', 'Y', 'U', 'V') /* Use default codec for specified filename (Linux only) */
 
 /* initialize video file writer */
 CVAPI(CvVideoWriter*) cvCreateVideoWriter( const char* filename, int fourcc,
@@ -429,7 +449,7 @@ CV_INLINE IplROI RectToROI( RECT r )
 #endif /* __cplusplus */
 
 
-#if defined __cplusplus && (!defined WIN32 || !defined (__GNUC__)) && !defined CV_NO_CVV_IMAGE
+#if defined __cplusplus && !defined CV_NO_CVV_IMAGE
 
 #define CImage CvvImage
 
@@ -493,5 +513,12 @@ protected:
 };
 
 #endif /* __cplusplus */
+
+
+/****************************************************************************************\
+*                                    New interface                                       *
+\****************************************************************************************/
+
+#include "highgui.hpp"
 
 #endif /* _HIGH_GUI_ */

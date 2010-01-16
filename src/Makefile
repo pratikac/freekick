@@ -9,7 +9,7 @@ C_OBJS = $(C_SRCS:.c=.o)
 CPP_OBJS = $(CPP_SRCS:.cpp=.o)
 OBJS = $(C_OBJS) $(CPP_OBJS)
 
-LIBS =  -L"../lib" -lblobslib -lcxcore -lcv -lhighgui -lvideoInput -lml -lcvaux
+LIBS =  -L"../lib" -lcxcore -lcv -lhighgui -lblobslib
 
 INCS =  -I"../include"
 
