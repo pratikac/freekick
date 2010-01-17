@@ -51,8 +51,8 @@
 #define BOT_COMPACTNESS_MIN             (0)
 #define BOT_COMPACTNESS_MAX             (10)
 
-#define GOAL_AREA_MIN                   (2500)
-#define GOAL_AREA_MAX                   (5500)
+#define GOAL_AREA_MIN                   (5000)
+#define GOAL_AREA_MAX                   (7000)
 #define GOAL_COMPACTNESS_MAX            (8)
 
 #define BALL_AREA_MIN                   (275)

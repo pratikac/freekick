@@ -19,8 +19,8 @@ using namespace std;
 #define BAUD_RATE       (38400)
 #define TOT_BALLS       (4)
 
-#define IMAGE_WIDTH     (640)
-#define IMAGE_HEIGHT    (480)
+#define IMAGE_WIDTH     (320)
+#define IMAGE_HEIGHT    (240)
 
 #define MIN_GOAL_DIST                   (10)
 #define CIRCLE_BOT_DIST                 (40)

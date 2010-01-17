@@ -9,8 +9,7 @@ C_OBJS = $(C_SRCS:.c=.o)
 CPP_OBJS = $(CPP_SRCS:.cpp=.o)
 OBJS = $(C_OBJS) $(CPP_OBJS)
 
-LIBS =  -L"../lib" -lcxcore -lcv -lhighgui -lblobslib
-
+LIBS =  -L"../lib" -lcxcore -lcv -lhighgui -lblobslib -lvideoInput -ldxguid -lstrmbase -lstrmiids -luuid -lole32 -loleaut32
 INCS =  -I"../include"
 
 CFLAGS = -O2 -Wall -Wextra -enable-auto-import

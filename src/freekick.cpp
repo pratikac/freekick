@@ -9,6 +9,7 @@ CvScalar orange = CV_RGB(255, 175, 0);
 CvScalar pink = CV_RGB(255, 0, 100);
 CvScalar yellow = CV_RGB(255, 255, 0);
 CvScalar cyan = CV_RGB(0, 255, 255);
+CvScalar black = CV_RGB(0, 0, 0);
 
 CvPoint redGoalMaskTopLeft, redGoalMaskBottomRight;
 CvPoint blueGoalMaskTopLeft, blueGoalMaskBottomRight;
@@ -29,27 +30,99 @@ CvPoint ballsPrev[TOT_BALLS] = {cvPoint(0,0)};
 
 // image variables
 IplImage* image;
-IplImage* blobsImg;
 // hsv and dst needed for extractBlobs (globals to avoid initialization on every call)
 IplImage* hsv = cvCreateImage(cvSize(IMAGE_WIDTH, IMAGE_HEIGHT), 8, 3);
 IplImage* dst = cvCreateImage(cvSize(IMAGE_WIDTH, IMAGE_HEIGHT), 8, 1);
+IplImage* blobsImg = cvCreateImage(cvSize(IMAGE_WIDTH, IMAGE_HEIGHT), 8, 3);
 
 // serial port handler
 HANDLE serialPort;
 
+
+void init_capture(CvCapture* frame)
+{
+    frame = cvCaptureFromCAM(0);
+}
+
+void getNextFrame(CvCapture* frame, IplImage* img)
+{
+    if(!cvGrabFrame(frame))
+    {
+        printf("Could not grab a frame\n\7");
+        return;
+    }
+    cout<<11<<endl;
+    img = cvRetrieveFrame(frame);
+}
+    
+
+
 int main()
 {
     image = cvLoadImage("arena.jpg");
+    /*
+    getBalls();
     getBots();
-	
+    getGoals();
+
     cvNamedWindow("old", 1);
-	cvNamedWindow("new", 1);
+	cvNamedWindow("seg", 1);
 	cvMoveWindow("old", 0,0);
-	cvMoveWindow("new", 0,400);
+	cvMoveWindow("seg", 0,400);
 
 	cvShowImage("old", image);
-	cvShowImage("new", dst);
-	cvWaitKey();
+	cvShowImage("seg", blobsImg);
+    */
+
+    cvNamedWindow("newImage", 1);
+    IplImage* newImage = cvCreateImage(cvSize(IMAGE_WIDTH,IMAGE_HEIGHT), 8, 3);
+    videoInput vin;
+    vin.setupDevice(0, IMAGE_WIDTH, IMAGE_HEIGHT);
+    CvVideoWriter *writer = 0;
+    writer=cvCreateVideoWriter("out.avi", CV_FOURCC_DEFAULT, 5 ,cvSize(IMAGE_WIDTH,frameH), 1);
+    for(int i=0; i<1000; i++)
+    {
+        vin.getPixels(0, (unsigned char*)newImage->imageData, 0, 1);
+        cvShowImage("newImage", newImage);
+        cvWriteFrame(writer, newImage);
+        cvWaitKey(20);
+    }
+    cvReleaseVideoWriter(&writer);
+    vin.stopDevice(0);
+
+    /*
+    CvCapture* capture = cvCreateCameraCapture(0);
+    //CvCapture* capture = cvCaptureFromCAM(0); // capture from video device #0
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 640); 
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 480); 
+    //cvSetCaptureProperty(capture, CV_CAP_PROP_FPS, 5); 
+    
+    cvQueryFrame(capture); 
+    int fps=(int) cvGetCaptureProperty(capture, CV_CAP_PROP_FPS);
+    int frameH    = (int) cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT);
+    int frameW    = (int) cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH);
+    cout<< frameH << " "<<frameW<<" "<<fps<<endl;
+    
+    
+    //CvVideoWriter *writer = 0;
+    //writer=cvCreateVideoWriter("out.avi", CV_FOURCC_DEFAULT, 5 ,cvSize(frameW,frameH), 1);
+    //CV_FOURCC('U','2','6','3'),
+    IplImage* newImage = 0; 
+    for(int i = 0; i< 10; i++)
+    {
+        if(!cvGrabFrame(capture))
+        {
+            printf("Could not grab a frame\n\7");
+            exit(0);
+        }
+        newImage=cvRetrieveFrame(capture);           // retrieve the captured frame
+        //cvWriteFrame(writer, newImage);
+        cvShowImage("newImage", newImage);
+        cvWaitKey(1);
+    }
+    //cvReleaseVideoWriter(&writer);
+    cvReleaseCapture(&capture);
+    */
 
     return 0;
 }
@@ -70,12 +143,12 @@ void getBots(void)
     //cout<<"numofBlobs1 : "<<blobs.GetNumBlobs()<<endl;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, BOT_AREA_MIN);
     //cout<<"numofBlobs2 : "<<blobs.GetNumBlobs()<<endl;
-    //drawBlobs(blobs, blobsImg, red);
+    drawBlobs(blobs, blobsImg, red);
 
     for(i=0; i < blobs.GetNumBlobs(); i++)
     {
         redBot[i].center = getCenter(blobs.GetBlob(i));
-        printf("Red Bot (x,y):\t%0.2f\t%0.2f\n", (float)redBot[i].center.x, (float)redBot[i].center.y);
+        //printf("Red Bot (x,y):\t%0.2f\t%0.2f\n", (float)redBot[i].center.x, (float)redBot[i].center.y);
     }
 
     // Blue Bot
@@ -84,12 +157,12 @@ void getBots(void)
     //cout<<"numofBlobs1 : "<<blobs.GetNumBlobs()<<endl;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, BOT_AREA_MIN);
     //cout<<"numofBlobs1 : "<<blobs.GetNumBlobs()<<endl;
-    //drawBlobs(blobs, blobsImg, blue);
+    drawBlobs(blobs, blobsImg, cyan);
 
     for(i=0; i < blobs.GetNumBlobs(); i++)
     {
         blueBot[i].center = getCenter(blobs.GetBlob(i));
-        printf("Blue Bot (x,y):\t%0.2f\t%0.2f\n", (float)blueBot[i].center.x, (float)blueBot[i].center.y);
+        //printf("Blue Bot (x,y):\t%0.2f\t%0.2f\n", (float)blueBot[i].center.x, (float)blueBot[i].center.y);
     }
 
     // depending upon the segmentation of tags, change the *ourBot pointers to point to redBot[0] or redBot[1]
@@ -104,8 +177,7 @@ void getBots(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_CIRCLE_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_CIRCLE_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_GREATER, TAG_CIRCLE_COMPACTNESS_MIN);
-    //drawBlobs(blobs, blobsImg, white);
-    printBlobArea(blobs);
+    drawBlobs(blobs, blobsImg, white);
  
     bGotCircle[RED]  = FALSE;
     bGotCircle[BLUE] = FALSE;
@@ -153,13 +225,12 @@ void getBots(void)
             break;
     }
     
-    /*
     // Rect
     blobs = blobsTemp;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_RECT_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_RECT_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, TAG_RECT_COMPACTNESS_MAX);
-    //drawBlobs(blobs, blobsImg, white);
+    drawBlobs(blobs, blobsImg, white);
  
     bGotRect[RED]  = FALSE;
     bGotRect[BLUE] = FALSE;
@@ -190,7 +261,6 @@ void getBots(void)
         if(bGotRect[RED] && bGotRect[BLUE])
             break;
     }
-    */
     //-----------------------------------------------------------------------------------------
 
     // Black Tags
@@ -201,7 +271,7 @@ void getBots(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_CIRCLE_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_CIRCLE_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_GREATER, TAG_CIRCLE_COMPACTNESS_MIN);
-    //drawBlobs(blobs, blobsImg, white);
+    drawBlobs(blobs, blobsImg, black);
  
     bGotCircle[RED]  = FALSE;
     bGotCircle[BLUE] = FALSE;
@@ -249,13 +319,12 @@ void getBots(void)
             break;
     }
     
-    /*
     // Rect
     blobs = blobsTemp;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_RECT_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_RECT_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, TAG_RECT_COMPACTNESS_MAX);
-    drawBlobs(blobs, blobsImg, white);
+    drawBlobs(blobs, blobsImg, black);
  
     bGotRect[RED]  = FALSE;
     bGotRect[BLUE] = FALSE;
@@ -287,7 +356,6 @@ void getBots(void)
             break;
     }
     //--------------------------------------------------------------------------
-    */
 
     for(i=0; i<2; i++)
     {
@@ -313,7 +381,7 @@ void getBalls(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, BALL_AREA_MAX);
     //blobs.Filter(blobs, B_EXCLUDE, CBlobGetCompactness(), B_GREATER, BALL_COMPACTNESS_MIN);
     // blobs.Filter(blobs, B_EXCLUDE, CBlobGetMean(), B_LESS, 200);
-    //drawBlobs(blobs, blobsImg, orange);
+    drawBlobs(blobs, blobsImg, orange);
     nBallsPresent = blobs.GetNumBlobs();
     
     for(int i=0; i<TOT_BALLS; i++)
@@ -348,61 +416,35 @@ void getGoals(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, GOAL_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, GOAL_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, GOAL_COMPACTNESS_MAX);
-    
-    // if the bot color also comes up due to bad thresholds, we need to choose the right most blob
-    if((blobs.GetNumBlobs() == 1) || (blobs.GetNumBlobs() == 2) )
+    if(blobs.GetNumBlobs() != 0)
     {
         drawBlobs(blobs, blobsImg, red);
-        if (blobs.GetNumBlobs() == 1)
-        {
-            blob = blobs.GetBlob(0);
-        }
-        else if(blobs.GetNumBlobs() == 2)
-        {
-            if(getXCenter(*blobs.GetBlob(0)) > getXCenter(*blobs.GetBlob(1)) ) // whichever is rightmost
-                blob = blobs.GetBlob(0);
-            else
-                blob = blobs.GetBlob(1);
-        }
+        blob = blobs.GetBlob(0);
         redGoal = getCenter(blob);
-        redGoalMaskTopLeft = cvPoint((int)blob.MinX(), (int)blob.MinY());
-        redGoalMaskBottomRight = cvPoint((int)blob.MaxX(), (int)blob.MaxY());
-        printf("Red Goal max_x: %d\n", (int)blob.MaxX());
-        //fprintf(locations, "Red Goal(x,y):\t%0.2f\t%0.2f\n", (float)redGoal.x, (float)redGoal.y);
+        //printf("Red Goal max_x: %d\n", (int)blob.MaxX());
     }
-    
+
     // Blue Goal
     blobs = extractBlobs(image, GOAL_B_HUE_L, GOAL_B_HUE_U, GOAL_B_SAT_L, GOAL_B_SAT_U);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, GOAL_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, GOAL_AREA_MIN);
     //blobs.Filter(blobs, B_INCLUDE, CBlobGetCompactness(), B_LESS, GOAL_COMPACTNESS_MAX);
-    
-    // if the bot color also comes up due to bad thresholds, we need to choose the right most blob
-    if((blobs.GetNumBlobs() == 1) || (blobs.GetNumBlobs() == 2) )
+    if(blobs.GetNumBlobs() != 0)
     {
+
         drawBlobs(blobs, blobsImg, blue);
-        if (blobs.GetNumBlobs() == 1)
-        {
-            blob = blobs.GetBlob(0);
-        }
-        else if(blobs.GetNumBlobs() == 2)
-        {
-            if(getXCenter(*blobs.GetBlob(0)) < getXCenter(*blobs.GetBlob(1)) ) // whichever is leftmost
-                blob = blobs.GetBlob(0);
-            else
-                blob = blobs.GetBlob(1);
-        }
+        blob = blobs.GetBlob(0);
         blueGoal = getCenter(blob);
-        blueGoalMaskTopLeft = cvPoint((int)blob.MinX(), (int)blob.MinY());
-        blueGoalMaskBottomRight = cvPoint((int)blob.MaxX(), (int)blob.MaxY());
-        printf("Blue Goal max_x: %d\n", (int)blob.MaxX());
-        //fprintf(locations, "Blue Goal(x,y):\t%0.2f\t%0.2f\n", (float)blueGoal.x, (float)blueGoal.y);
-    }
+        //printf("Blue Goal max_x: %d\n", (int)blob.MaxX());
+    } 
     return;
 }
 
 void drawBlobs(CBlobResult blobs, IplImage* img, CvScalar color)
 {
+    if(blobs.GetNumBlobs() == 0)
+        return;
+
     CBlob blob;
     CvPoint point;
     
@@ -468,11 +510,6 @@ inline CvPoint getCenter(CBlob blob)
 inline float angleOfBot(Bot* bot)
 {
     return (float)(180 / (CV_PI) * atan2((float)(bot->center.y - bot->circleCenter.y), (float)(bot->circleCenter.x - bot->center.x)));
-}
-
-inline float dist(CvPoint p1, CvPoint p2)
-{
-    return sqrt((float)((p1.x - p2.x)*(p1.x - p2.x) + (p1.y - p2.y)*(p1.y - p2.y)));
 }
 
 void printBlobArea(CBlobResult blob)

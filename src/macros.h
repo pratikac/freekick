@@ -10,4 +10,6 @@ typedef signed int sint;
 #define DEG2RAD(x)  ((x)*PI/180)
 #define RAD2DEG(x)	((x)/PI*180)
 
+#define ABS(x)      ( ((x) > 0) ? (x) : (-(x)))
+
 #endif
