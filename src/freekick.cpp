@@ -26,7 +26,18 @@ CvPoint *pballs;                            // pointer to iterate
 int nBallsPresent = TOT_BALLS;
 bool ballCaught = FALSE;
 int closestBallIndex = 0;
-CvPoint ballsPrev[TOT_BALLS] = {cvPoint(0,0)};
+
+// RRT vars
+CvPoint Empty;
+CvPointNode     path[MAX_NODES];
+int             numObstacles = 6;
+bool            getObstacles = true;
+vector<CvPoint> lines;
+
+// 4 robots + 2 Ds
+// check the enum in the header
+Obstacle        obs[6];
+
 
 // image variables
 IplImage* image;
@@ -39,29 +50,22 @@ IplImage* blobsImg = cvCreateImage(cvSize(IMAGE_WIDTH, IMAGE_HEIGHT), 8, 3);
 HANDLE serialPort;
 
 
-void init_capture(CvCapture* frame)
-{
-    frame = cvCaptureFromCAM(0);
-}
-
-void getNextFrame(CvCapture* frame, IplImage* img)
-{
-    if(!cvGrabFrame(frame))
-    {
-        printf("Could not grab a frame\n\7");
-        return;
-    }
-    cout<<11<<endl;
-    img = cvRetrieveFrame(frame);
-}
-    
-
-
 int main()
 {
+    initrand();
+
     image = cvLoadImage("arena.jpg");
-    /*
-    getBalls();
+    
+    ourColor = BLUE;
+    ourBot[BLACK]->state = IDLE;
+    ourBot[WHITE]->state = IDLE;
+    ourBot[BLACK]->current_dest = OUR_INF;
+    ourBot[WHITE]->current_dest = OUR_INF;
+
+    Empty.x = 2*IMAGE_WIDTH;
+    Empty.y = 2*IMAGE_HEIGHT;
+
+    //getBalls();
     getBots();
     getGoals();
 
@@ -70,11 +74,61 @@ int main()
 	cvMoveWindow("old", 0,0);
 	cvMoveWindow("seg", 0,400);
 
+
+    
+    CvPoint dest;
+    dest.x = 550;
+    dest.y = 240;
+    int total_nodes;
+    total_nodes = RRTPlan(ourBot[WHITE]->center, dest, WHITE);
+    smoothenRRTPath(total_nodes);
+    drawPath(blobsImg, green);
+
 	cvShowImage("old", image);
 	cvShowImage("seg", blobsImg);
-    */
 
-    cvNamedWindow("newImage", 1);
+    cvWaitKey();
+
+
+
+
+    CvPoint closestBall;
+
+    while(nBallsPresent)
+    {
+        switch(ourBot[WHITE]->state)
+        {
+            case (IDLE):
+                getClosestBall(ourBot[WHITE]);
+                break;
+            case (MOVE):
+                total_nodes = RRTPlan(ourBot[WHITE]->center, closestBall, WHITE);
+                smoothenRRTPath(total_nodes);
+                moveToPoint(ourBot[WHITE]);
+                
+
+
+        //Bot1
+        
+        
+        
+        //Bot2
+
+
+
+
+
+
+
+
+
+
+    }
+
+
+
+    /*
+    cvNamedWindow("newImage", 0);
     IplImage* newImage = cvCreateImage(cvSize(IMAGE_WIDTH,IMAGE_HEIGHT), 8, 3);
     videoInput vin;
     vin.setupDevice(0, IMAGE_WIDTH, IMAGE_HEIGHT);
@@ -89,40 +143,8 @@ int main()
     }
     cvReleaseVideoWriter(&writer);
     vin.stopDevice(0);
-
-    /*
-    CvCapture* capture = cvCreateCameraCapture(0);
-    //CvCapture* capture = cvCaptureFromCAM(0); // capture from video device #0
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 640); 
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 480); 
-    //cvSetCaptureProperty(capture, CV_CAP_PROP_FPS, 5); 
-    
-    cvQueryFrame(capture); 
-    int fps=(int) cvGetCaptureProperty(capture, CV_CAP_PROP_FPS);
-    int frameH    = (int) cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT);
-    int frameW    = (int) cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH);
-    cout<< frameH << " "<<frameW<<" "<<fps<<endl;
-    
-    
-    //CvVideoWriter *writer = 0;
-    //writer=cvCreateVideoWriter("out.avi", CV_FOURCC_DEFAULT, 5 ,cvSize(frameW,frameH), 1);
-    //CV_FOURCC('U','2','6','3'),
-    IplImage* newImage = 0; 
-    for(int i = 0; i< 10; i++)
-    {
-        if(!cvGrabFrame(capture))
-        {
-            printf("Could not grab a frame\n\7");
-            exit(0);
-        }
-        newImage=cvRetrieveFrame(capture);           // retrieve the captured frame
-        //cvWriteFrame(writer, newImage);
-        cvShowImage("newImage", newImage);
-        cvWaitKey(1);
-    }
-    //cvReleaseVideoWriter(&writer);
-    cvReleaseCapture(&capture);
     */
+
 
     return 0;
 }
@@ -144,7 +166,7 @@ void getBots(void)
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, BOT_AREA_MIN);
     //cout<<"numofBlobs2 : "<<blobs.GetNumBlobs()<<endl;
     drawBlobs(blobs, blobsImg, red);
-
+    
     for(i=0; i < blobs.GetNumBlobs(); i++)
     {
         redBot[i].center = getCenter(blobs.GetBlob(i));
@@ -162,7 +184,7 @@ void getBots(void)
     for(i=0; i < blobs.GetNumBlobs(); i++)
     {
         blueBot[i].center = getCenter(blobs.GetBlob(i));
-        //printf("Blue Bot (x,y):\t%0.2f\t%0.2f\n", (float)blueBot[i].center.x, (float)blueBot[i].center.y);
+        printf("Blue Bot (x,y):\t%0.2f\t%0.2f\n", (float)blueBot[i].center.x, (float)blueBot[i].center.y);
     }
 
     // depending upon the segmentation of tags, change the *ourBot pointers to point to redBot[0] or redBot[1]
@@ -189,36 +211,60 @@ void getBots(void)
             redBot[0].circleCenter = whiteTemp;
             bGotCircle[RED] = TRUE;
             if(ourColor == RED)
+            {
                 ourBot[WHITE] = &redBot[0];
+                ourBot[BLACK] = &redBot[1];
+            }
             else
+            {
                 opponentBot[WHITE] = &redBot[0];
+                opponentBot[BLACK] = &redBot[1];
+            }
         }
         else if (dist(redBot[1].center, whiteTemp) < CIRCLE_BOT_DIST)
         {
             redBot[1].circleCenter = whiteTemp;
             bGotCircle[RED] = TRUE;
             if(ourColor == RED)
+            {
                 ourBot[WHITE] = &redBot[1];
+                ourBot[BLACK] = &redBot[0];
+            }
             else
+            {
                 opponentBot[WHITE] = &redBot[1];
+                opponentBot[BLACK] = &redBot[0];
+            }
         }
         else if (dist(blueBot[0].center, whiteTemp) < CIRCLE_BOT_DIST)
         {
             blueBot[0].circleCenter = whiteTemp;
             bGotCircle[BLUE] = TRUE;
             if(ourColor == BLUE)
+            {
                 ourBot[WHITE] = &blueBot[0];
+                ourBot[BLACK] = &blueBot[1];
+            }
             else
+            {
                 opponentBot[WHITE] = &blueBot[0];
+                opponentBot[BLACK] = &blueBot[1];
+            }
         }
         else if (dist(blueBot[1].center, whiteTemp) < CIRCLE_BOT_DIST)
         {
             blueBot[1].circleCenter = whiteTemp;
             bGotCircle[BLUE] = TRUE;
             if(ourColor == BLUE)
+            {
                 ourBot[WHITE] = &blueBot[1];
+                ourBot[BLACK] = &blueBot[0];
+            }
             else
+            {
                 opponentBot[WHITE] = &blueBot[1];
+                opponentBot[BLACK] = &blueBot[0];
+            }
         }
 
         if(bGotCircle[RED] && bGotCircle[BLUE])
@@ -266,7 +312,7 @@ void getBots(void)
     // Black Tags
     blobs = extractBlobs(image, TAG_B_HUE_L, TAG_B_HUE_U, TAG_B_SAT_L, TAG_B_SAT_U, TAG_B_VAL_L, TAG_B_VAL_U);
 
-    // Cirlces
+    // Circles
     blobsTemp = blobs;
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_GREATER, TAG_CIRCLE_AREA_MAX);
     blobs.Filter(blobs, B_EXCLUDE, CBlobGetArea(), B_LESS, TAG_CIRCLE_AREA_MIN);
@@ -275,6 +321,7 @@ void getBots(void)
  
     bGotCircle[RED]  = FALSE;
     bGotCircle[BLUE] = FALSE;
+
     for(i = 0; i < blobs.GetNumBlobs(); i++)
     {
         blackTemp = getCenter(blobs.GetBlob(i));
@@ -283,36 +330,60 @@ void getBots(void)
             redBot[0].circleCenter = blackTemp;
             bGotCircle[RED] = TRUE;
             if(ourColor == RED)
+            {
                 ourBot[BLACK] = &redBot[0];
+                ourBot[WHITE] = &redBot[1];
+            }
             else
+            {
                 opponentBot[BLACK] = &redBot[0];
+                opponentBot[WHITE] = &redBot[1];
+            }
         }
         else if (dist(redBot[1].center, blackTemp) < CIRCLE_BOT_DIST)
         {
             redBot[1].circleCenter = blackTemp;
             bGotCircle[RED] = TRUE;
             if(ourColor == RED)
+            {
                 ourBot[BLACK] = &redBot[1];
+                ourBot[WHITE] = &redBot[0];
+            }
             else
+            {
                 opponentBot[BLACK] = &redBot[1];
+                opponentBot[WHITE] = &redBot[0];
+            }
         }
         else if (dist(blueBot[0].center, blackTemp) < CIRCLE_BOT_DIST)
         {
             blueBot[0].circleCenter = blackTemp;
             bGotCircle[BLUE] = TRUE;
             if(ourColor == BLUE)
+            {
                 ourBot[BLACK] = &blueBot[0];
+                ourBot[WHITE] = &blueBot[1];
+            }
             else
+            {
                 opponentBot[BLACK] = &blueBot[0];
+                opponentBot[WHITE] = &blueBot[1];
+            }
         }
         else if (dist(blueBot[1].center, blackTemp) < CIRCLE_BOT_DIST)
         {
             blueBot[1].circleCenter = blackTemp;
             bGotCircle[BLUE] = TRUE;
             if(ourColor == BLUE)
+            {
                 ourBot[BLACK] = &blueBot[1];
+                ourBot[WHITE] = &blueBot[0];
+            }
             else
+            {
                 opponentBot[BLACK] = &blueBot[1];
+                opponentBot[WHITE] = &blueBot[0];
+            }
         }
 
         if(bGotCircle[RED] && bGotCircle[BLUE])
@@ -363,6 +434,9 @@ void getBots(void)
         opponentBot[i]->angle = angleOfBot(opponentBot[i]);
     }
     printBotParams();
+
+    writeObstacles();
+ 
     return;
 }
 
@@ -393,7 +467,10 @@ void getBalls(void)
             //ballsPrev[i] = balls[i];
         }
         else
-            balls[i] = cvPoint(OUR_INF, OUR_INF);
+        {
+            balls[i].x = OUR_INF;
+            balls[i].y = OUR_INF;
+        }
     }
 
     if((nBallsPresent == 0) && (ballCaught == FALSE) )
@@ -454,9 +531,24 @@ void drawBlobs(CBlobResult blobs, IplImage* img, CvScalar color)
     for (int x = 0; x < blobs.GetNumBlobs(); x++)
     {
         blob = blobs.GetBlob(x);
-        point = cvPoint((int)(getXCenter(blob)), (int)(getYCenter(blob)));
+        point.x = (int)(getXCenter(blob));
+        point.y = (int)(getYCenter(blob));
         blob.FillBlob(img, color);
         cvCircle(img, point, 2, white, -1);
+    }
+}
+
+void drawPath(IplImage* img, CvScalar color)
+{
+
+    if(lines.size() == 0)
+    {
+        return;
+    }
+    
+    for (int i = 0; i < lines.size()-1; i++)
+    {
+        cvLine(img, lines[i], lines[i+1], color);
     }
 }
 
@@ -504,7 +596,11 @@ inline CvPoint getCenter(CBlob blob)
 {
     CBlobGetXCenter getXCenter;
     CBlobGetYCenter getYCenter;
-    return cvPoint((int)(getXCenter(blob)), (int)(getYCenter(blob)));
+    CvPoint temp;
+    temp.x = (int)(getXCenter(blob));
+    temp.y = (int)(getYCenter(blob));
+
+    return temp;
 }
 
 inline float angleOfBot(Bot* bot)
@@ -533,4 +629,274 @@ void printBotParams()
         cout<<"Red: "<<i<<" x: "<<redBot[i].center.x<<" y: "<<redBot[i].center.y<<" angle: "<<redBot[i].angle<<endl;
     for(int i=0; i<2; i++)
         cout<<"Blue: "<<i<<" x: "<<blueBot[i].center.x<<" y: "<<blueBot[i].center.y<<" angle: "<<blueBot[i].angle<<endl;
+}
+
+void writeObstacles(void)
+{
+    // write obs[] array
+    obs[OBS_D_L].center.x = -IMAGE_WIDTH/2;
+    obs[OBS_D_L].center.y = 0;
+    obs[OBS_D_L].radius = 400/SCALE_FACTOR + ROBOT_RADIUS;
+    
+    obs[OBS_D_R].center.x = IMAGE_WIDTH/2;
+    obs[OBS_D_R].center.y = 0;
+    obs[OBS_D_R].radius = 400/SCALE_FACTOR + ROBOT_RADIUS;
+    
+    if(ourColor == RED)
+    {
+        obs[OBS_RED_W].center = ourBot[WHITE]->center;
+        obs[OBS_RED_W].radius = ROBOT_RADIUS;
+        obs[OBS_RED_B].center = ourBot[BLACK]->center;
+        obs[OBS_RED_B].radius = ROBOT_RADIUS;
+
+        obs[OBS_BLUE_W].center = opponentBot[WHITE]->center;
+        obs[OBS_BLUE_W].radius = ROBOT_RADIUS;
+        obs[OBS_BLUE_B].center = opponentBot[BLACK]->center;
+        obs[OBS_BLUE_B].radius = ROBOT_RADIUS;
+    }
+    else if(ourColor == BLUE)
+    {
+        obs[OBS_RED_W].center = opponentBot[WHITE]->center;
+        obs[OBS_RED_W].radius = ROBOT_RADIUS;
+        obs[OBS_RED_B].center = opponentBot[BLACK]->center;
+        obs[OBS_RED_B].radius = ROBOT_RADIUS;
+
+        obs[OBS_BLUE_W].center = ourBot[WHITE]->center;
+        obs[OBS_BLUE_W].radius = ROBOT_RADIUS;
+        obs[OBS_BLUE_B].center = ourBot[BLACK]->center;
+        obs[OBS_BLUE_B].radius = ROBOT_RADIUS;
+    }
+};
+
+unsigned int RRTPlan(CvPoint initial, CvPoint goal, int botColor)
+{
+    CvPointNode nearest;
+    CvPoint extended, target;
+    unsigned int i = 0;
+    nearest.point = initial;
+    // The first point in the path is the starting point
+    path[0].point = initial;
+    path[0].parentIndex = 0;
+    i = 1;
+    while( (dist(nearest.point, goal) > THRESHOLD) && (i < MAX_NODES) )
+    {
+        target = getCurrentTarget(goal);
+#ifdef VERBOSE
+        fprintf(stderr, "Got target: (%d, %d)\n", target.x, target.y);
+#endif
+        nearest = Nearest(target, i);
+        extended = Extend(nearest.point, target, botColor);
+        if ( (extended.x != Empty.x) || (extended.y != Empty.y))
+        {
+            path[i].point = extended;
+            path[i].parentIndex = nearest.parentIndex;
+            i++;
+        }
+    }
+#ifdef VERBOSE
+    if( i == MAX_NODES)
+        fprintf(stderr, "MAX_NODES REACHED!\n");
+#endif
+    return i;
+}
+
+void smoothenRRTPath(int num_nodes)
+{
+    int i = num_nodes - 1;
+    CvPoint prevPoint, startPoint, endPoint;
+    startPoint = path[0].point;
+    printf("%d, %d\n", startPoint.x, startPoint.y);
+    lines.clear();
+    lines.push_back(startPoint);
+    bool done = false;
+    while(!done)
+    {
+        endPoint = path[i].point;
+        if(lineHitsObstacles(startPoint, endPoint))
+        {
+            i = path[i].parentIndex;
+            endPoint = path[i].point;
+#ifdef VERBOSE
+            fprintf(stderr, "trying point %d/%d: %d, %d\n",
+                    i, num_nodes-1, endPoint.x, endPoint.y);
+#endif
+        }
+        else
+        {
+            startPoint = endPoint;
+            printf("%d, %d\n", startPoint.x, startPoint.y);
+            lines.push_back(startPoint);
+            i = num_nodes - 1;
+            if((startPoint.x == path[num_nodes - 1].point.x) && (startPoint.y == path[num_nodes - 1].point.y))
+                done = true;
+        }
+    }
+    printf("LinesDone\n");
+}
+
+
+CvPoint Extend(CvPoint nearest, CvPoint target, int botColor)
+{
+    CvPoint extended = Empty;
+    unsigned int distance = (unsigned int) dist(nearest, target);
+    if ( distance < EXTEND_DIST )
+        extended = target;
+    else
+    {
+        extended.x = (int)(nearest.x + (float)(target.x - nearest.x)*EXTEND_DIST/distance);
+        extended.y = (int)(nearest.y + (float)(target.y - nearest.y)*EXTEND_DIST/distance);
+#ifdef VERBOSE
+        fprintf(stderr, "nearest: (%d, %d), target: (%d, %d), extended: (%d, %d)\n",
+                nearest.x, nearest.y, target.x, target.y, extended.x, extended.y);
+#endif
+    }
+
+    if ( isObstructed(extended, botColor) )
+    {
+#ifdef VERBOSE
+        fprintf(stderr, "Collision: (%d, %d)\n", extended.x, extended.y);
+#endif
+        return Empty;
+    }
+    else
+        return extended;
+}
+
+CvPointNode Nearest(CvPoint target, unsigned int num_nodes)
+{
+    CvPointNode nearest;
+    unsigned int min_dist = UINT_MAX;
+    unsigned int cur_dist = UINT_MAX;
+    nearest.point = path[0].point;
+
+    for (unsigned int i = 0; i < num_nodes; i++)
+    {
+        cur_dist = (unsigned int) dist(path[i].point, target);
+        if (cur_dist < min_dist)
+        {
+            min_dist = cur_dist;
+            nearest = path[i];
+            nearest.parentIndex = i;
+        }
+    }
+    return nearest;
+}
+
+bool isObstructed(CvPoint p, int botColor)
+{
+    int i;
+    int retFlag = 0;
+    for(i = 0; i < 2; i++)
+    {
+        if(ourColor == RED)
+        {
+            if(dist(blueBot[i].center, p) < (2*ROBOT_RADIUS) ) 
+            {
+                retFlag  = 1;
+            }
+        }
+        else
+        {
+            if(dist(redBot[i].center, p) < (2*ROBOT_RADIUS) ) 
+            {
+                retFlag  = 1;
+            }
+        }
+    }
+    if(botColor == WHITE)
+    {
+        if(dist(ourBot[BLACK]->center, p) < (2*ROBOT_RADIUS) ) 
+        {
+            retFlag  = 1;
+        }
+    }
+    else if(botColor == BLACK)
+    {
+        if(dist(ourBot[WHITE]->center, p) < (2*ROBOT_RADIUS) ) 
+        {
+            retFlag  = 1;
+        }
+    }
+
+    if(  ( p.x <= (DEE_LEFT_NORTH_X + ROBOT_RADIUS)  ))// || (p.x >= (DEE_RIGHT_NORTH_X - ROBOT_RADIUS)) ))
+    {
+        retFlag = 1;
+    }
+
+    return retFlag;
+}
+
+inline float dist(CvPoint i, CvPoint j)
+{
+    return sqrt( (float)((j.x - i.x)*(j.x - i.x) + (j.y - i.y)*(j.y - i.y)) );
+}
+
+CvPoint getCurrentTarget(CvPoint goal)
+{
+    float p;
+    p = randfloat();
+    if (p < GOAL_PROB)
+        return goal;
+    else
+        return RandomPoint();
+}
+
+CvPoint RandomPoint(void)
+{
+    CvPoint random;
+    random.x = randint(IMAGE_WIDTH);
+    random.y = randint(IMAGE_HEIGHT);
+    return random;
+}
+
+int lineHitsObstacles(CvPoint start, CvPoint end)
+{
+    /*
+     * Given that p1 and p2 both lie outside the obstacle, the line segment between p1
+     * and p2 hits an obstacle iff:
+     * 1) The distance between the line joining p1, p2 is less than the obstacle radius.
+     * 2) The projection of the center of the obstacle is lies between p1 and p2.
+     */
+
+    float xp, yp, dotProduct;
+    int xo, yo; // Obstacle x, y co-ordinates
+    float obsDist;
+
+    float a = end.y - start.y;
+    float b = start.x - end.x;
+    float c = (end.x - start.x)*start.y - (end.y - start.y)*start.x;
+
+#ifdef VERBOSE
+    fprintf(stderr, "checking points: (%d, %d), (%d, %d)\n", start.x, start.y,
+            end.x, end.y);
+#endif
+
+    for(int i = 2; i < 6; i++)
+    {
+        xo = obs[i].center.x;
+        yo = obs[i].center.y;
+
+        xp = xo - a*(a*xo + b*yo + c)/(a*a + b*b);
+        yp = yo - b*(a*xo + b*yo + c)/(a*a + b*b);
+
+        obsDist = sqrt((xp - xo)*(xp - xo) + (yp -yo)*(yp -yo));
+#ifdef VERBOSE
+        fprintf(stderr, "projected: (%f, %f), dist: %f\n", xp, yp, obsDist);
+#endif
+        if( obsDist + EPSILON <  (obs[i].radius + ROBOT_RADIUS))
+        {
+            dotProduct = (start.x - xp)*(end.x - xp)\
+                         + (start.y - yp)*(end.y - yp);
+
+            if(dotProduct < 0)
+            {
+#ifdef VERBOSE
+                fprintf(stderr, "HIT\n");
+#endif
+                return 1;
+            }
+        }
+    }
+
+    return 0;
 }
