@@ -1,0 +1,33 @@
+2 add 2 bot:
+	currentNode;
+	dribblerState;
+
+In each frame:
+	getPicture();
+	
+	For Each bot:
+		IDLE:	
+			currDest -> nearest ball
+			state->MOVETOBALL
+	
+		MOVE2BALL:
+			if size(lines) = 0, callRRT
+			else check next node
+					if obstructed run RRT
+					if last node && close to ball, state->CAPTURE
+		CAPTURE:
+			dribblerState -> on
+			
+		MOVE2GOAL:
+			currDest->goal
+			if size(lines) = 0, callRRT
+			speed -> slowspeed
+			else check next node
+				if obstructed run RRT
+				if last node && close to ball, state->CAPTURE
+		
+			
+		
+			
+			
+			

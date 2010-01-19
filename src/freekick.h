@@ -76,9 +76,18 @@ typedef struct Bot
     CvPoint circleCenter;
     CvPoint rectCenter;
     int state;
-    CvPoint current_dest;
+    vector<CvPoint> currentPath;
+    int currentNodeIndex;	//stores index of the current node in currentPath
+    CvPoint currentDest;
 }
 Bot;
+
+// OUT OF SHEER FRUSTRATION
+void set(CvPoint* dest, int x, int y)
+{
+	dest->x = x;
+	dest->y = y;
+}
 
 enum 
 {
@@ -112,17 +121,16 @@ class Obstacle
 
 };
 
-unsigned int RRTPlan(CvPoint, CvPoint, int);
-CvPoint Extend(CvPoint, CvPoint, int);
+unsigned int RRTPlan(Bot*);
+CvPoint Extend(CvPoint, CvPoint, Bot*);
 CvPointNode Nearest(CvPoint, unsigned int);
 inline float dist(CvPoint, CvPoint);
 CvPoint getCurrentTarget(CvPoint);
 CvPoint RandomPoint(void);
-bool isObstructed(CvPoint, int);
+bool isObstructed(CvPoint, Bot*);
 int lineHitsObstacles(CvPoint, CvPoint);
 void writeObstacles(void);
-void smoothenRRTPath(int);
-void drawPath(IplImage*, CvScalar);
+void drawPath(Bot* ,IplImage*, CvScalar);
 
 void initBots(void);
 void getGoals(void);

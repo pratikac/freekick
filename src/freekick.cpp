@@ -57,41 +57,45 @@ int main()
     image = cvLoadImage("arena.jpg");
     
     ourColor = BLUE;
-    ourBot[BLACK]->state = IDLE;
-    ourBot[WHITE]->state = IDLE;
-    ourBot[BLACK]->current_dest = OUR_INF;
-    ourBot[WHITE]->current_dest = OUR_INF;
+    //ourBot[BLACK]->state = IDLE;
+    //ourBot[WHITE]->state = IDLE;
+    //set(ourBot[BLACK]->currentDest, OUR_INF, OUR_INF);
+    //set(ourBot[WHITE]->currentDest, OUR_INF, OUR_INF);
 
     Empty.x = 2*IMAGE_WIDTH;
     Empty.y = 2*IMAGE_HEIGHT;
 
+    cout<<"1"<<endl;
     //getBalls();
     getBots();
     getGoals();
 
     cvNamedWindow("old", 1);
-	cvNamedWindow("seg", 1);
-	cvMoveWindow("old", 0,0);
-	cvMoveWindow("seg", 0,400);
+    cvNamedWindow("seg", 1);
+    cvMoveWindow("old", 0,0);
+    cvMoveWindow("seg", 0,400);
 
 
+    CvPoint temp;
+    set(&temp, 550, 240);
+    cout<<"temp: "<<temp.x<<" "<<temp.y<<endl;
     
-    CvPoint dest;
-    dest.x = 550;
-    dest.y = 240;
-    int total_nodes;
-    total_nodes = RRTPlan(ourBot[WHITE]->center, dest, WHITE);
-    smoothenRRTPath(total_nodes);
-    drawPath(blobsImg, green);
+    set(&(ourBot[WHITE]->currentDest), 550, 240);
+    cout<<"Destination: "<<ourBot[WHITE]->currentDest.x<<" "<<ourBot[WHITE]->currentDest.y<<endl;
+    RRTPlan(ourBot[WHITE]);
+    //smoothenRRTPath(total_nodes);
+    drawPath(ourBot[WHITE], blobsImg, green);
 
-	cvShowImage("old", image);
-	cvShowImage("seg", blobsImg);
+    cvShowImage("old", image);
+    cvShowImage("seg", blobsImg);
 
     cvWaitKey();
+    
 
 
 
 
+    /*
     CvPoint closestBall;
 
     while(nBallsPresent)
@@ -115,15 +119,8 @@ int main()
         //Bot2
 
 
-
-
-
-
-
-
-
-
     }
+    */
 
 
 
@@ -149,6 +146,13 @@ int main()
     return 0;
 }
 
+void getPicture()
+{
+	getGoals();
+	getBots();
+	getBalls();
+}
+
 
 void getBots(void)
 {
@@ -157,7 +161,7 @@ void getBots(void)
     CvPoint whiteTemp, blackTemp;
     bool bGotCircle[2] = {FALSE, FALSE};        //[0] = RED, [1] = BLUE
     bool bGotRect[2] = {FALSE, FALSE};
-    int i,j;
+    int i;
 
     // Red Bot
     blobs = extractBlobs(image, TEAM_R_HUE_L, TEAM_R_HUE_U, TEAM_R_SAT_L, TEAM_R_SAT_U);
@@ -538,17 +542,17 @@ void drawBlobs(CBlobResult blobs, IplImage* img, CvScalar color)
     }
 }
 
-void drawPath(IplImage* img, CvScalar color)
+void drawPath(Bot* ourbot, IplImage* img, CvScalar color)
 {
 
-    if(lines.size() == 0)
+    if(ourbot->currentPath.size() == 0)
     {
         return;
     }
     
-    for (int i = 0; i < lines.size()-1; i++)
+    for (int i = 0; i < ourbot->currentPath.size()-1; i++)
     {
-        cvLine(img, lines[i], lines[i+1], color);
+        cvLine(img, ourbot->currentPath[i], ourbot->currentPath[i+1], color);
     }
 }
 
@@ -668,14 +672,18 @@ void writeObstacles(void)
     }
 };
 
-unsigned int RRTPlan(CvPoint initial, CvPoint goal, int botColor)
+unsigned int RRTPlan(Bot* ourbot)
 {
     CvPointNode nearest;
-    CvPoint extended, target;
+    CvPoint extended, target, goal;
+
+    nearest.point = ourbot->center;
+    goal = ourbot->currentDest;
+
+
     unsigned int i = 0;
-    nearest.point = initial;
     // The first point in the path is the starting point
-    path[0].point = initial;
+    path[0].point = ourbot->center;
     path[0].parentIndex = 0;
     i = 1;
     while( (dist(nearest.point, goal) > THRESHOLD) && (i < MAX_NODES) )
@@ -685,7 +693,7 @@ unsigned int RRTPlan(CvPoint initial, CvPoint goal, int botColor)
         fprintf(stderr, "Got target: (%d, %d)\n", target.x, target.y);
 #endif
         nearest = Nearest(target, i);
-        extended = Extend(nearest.point, target, botColor);
+        extended = Extend(nearest.point, target, ourbot);
         if ( (extended.x != Empty.x) || (extended.y != Empty.y))
         {
             path[i].point = extended;
@@ -697,17 +705,19 @@ unsigned int RRTPlan(CvPoint initial, CvPoint goal, int botColor)
     if( i == MAX_NODES)
         fprintf(stderr, "MAX_NODES REACHED!\n");
 #endif
-    return i;
-}
+    //return i;
+    int num_nodes = i;
 
-void smoothenRRTPath(int num_nodes)
-{
-    int i = num_nodes - 1;
+    
+    // HERE IS WHERE WE SMOOTH THE PATH OBTAINED 
+    i = num_nodes -1;
     CvPoint prevPoint, startPoint, endPoint;
     startPoint = path[0].point;
+   
+    //startPoint.x = path[0].point.x; startPoint.y = path[0].point.y;
     printf("%d, %d\n", startPoint.x, startPoint.y);
-    lines.clear();
-    lines.push_back(startPoint);
+    ourbot->currentPath.clear();
+    ourbot->currentPath.push_back(startPoint);
     bool done = false;
     while(!done)
     {
@@ -725,17 +735,20 @@ void smoothenRRTPath(int num_nodes)
         {
             startPoint = endPoint;
             printf("%d, %d\n", startPoint.x, startPoint.y);
-            lines.push_back(startPoint);
+            ourbot->currentPath.push_back(startPoint);
             i = num_nodes - 1;
             if((startPoint.x == path[num_nodes - 1].point.x) && (startPoint.y == path[num_nodes - 1].point.y))
                 done = true;
         }
     }
     printf("LinesDone\n");
+
+    return num_nodes;
 }
 
 
-CvPoint Extend(CvPoint nearest, CvPoint target, int botColor)
+
+CvPoint Extend(CvPoint nearest, CvPoint target, Bot* ourbot)
 {
     CvPoint extended = Empty;
     unsigned int distance = (unsigned int) dist(nearest, target);
@@ -751,7 +764,7 @@ CvPoint Extend(CvPoint nearest, CvPoint target, int botColor)
 #endif
     }
 
-    if ( isObstructed(extended, botColor) )
+    if ( isObstructed(extended, ourbot) )
     {
 #ifdef VERBOSE
         fprintf(stderr, "Collision: (%d, %d)\n", extended.x, extended.y);
@@ -782,7 +795,7 @@ CvPointNode Nearest(CvPoint target, unsigned int num_nodes)
     return nearest;
 }
 
-bool isObstructed(CvPoint p, int botColor)
+bool isObstructed(CvPoint p, Bot* ourbot)
 {
     int i;
     int retFlag = 0;
@@ -803,14 +816,16 @@ bool isObstructed(CvPoint p, int botColor)
             }
         }
     }
-    if(botColor == WHITE)
+    //if(botColor == WHITE)
+    if(ourbot == ourBot[WHITE])
     {
         if(dist(ourBot[BLACK]->center, p) < (2*ROBOT_RADIUS) ) 
         {
             retFlag  = 1;
         }
     }
-    else if(botColor == BLACK)
+    //else if(botColor == BLACK)
+    else if(ourbot == ourBot[BLACK])
     {
         if(dist(ourBot[WHITE]->center, p) < (2*ROBOT_RADIUS) ) 
         {
