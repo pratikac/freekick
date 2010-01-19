@@ -27,7 +27,9 @@ using namespace std;
 #define MIN_GOAL_DIST                   (10)
 #define CIRCLE_BOT_DIST                 (40)
 #define BALL_DETECTION_FRAMES_TO_AVG    (1)
-#define MIN_BALL_DIST                   (30)
+
+#define BALL_CAPTURE_DIST                   (50)
+#define DRIBBLER_START_DIST                 (150)
 #define OUR_INF                         (IMAGE_WIDTH*10)
 
 #define EPSILON         (0.2)
@@ -69,6 +71,13 @@ enum
     OBS_BLUE_B
 };
 
+enum
+{
+    DRIBBLER_OFF = 0,
+    DRIBBLER_IN,
+    DRIBBLER_OUT
+};
+
 typedef struct Bot
 {
     CvPoint center;
@@ -79,6 +88,9 @@ typedef struct Bot
     vector<CvPoint> currentPath;
     int currentNodeIndex;	//stores index of the current node in currentPath
     CvPoint currentDest;
+    float angleDest;
+    int ballIndex;
+    int dribblerState;
 }
 Bot;
 
@@ -91,11 +103,11 @@ void set(CvPoint* dest, int x, int y)
 
 enum 
 {
-    IDLE,
-    MOVE,
-    CAPTURE,
-    DRIBBLE,
-    SHOOT,
+    IDLE=0,
+    MOVE_TO_BALL,
+    CAPTURED,
+    MOVE_TO_GOAL,
+    SHOOT
 };
 
 typedef struct
@@ -138,12 +150,15 @@ void getBots(void);
 void getBalls(void);
 void drawBlobs(CBlobResult blobs, IplImage* img, CvScalar color);
 CBlobResult extractBlobs(IplImage *img, uchar hueL, uchar hueU, uchar satL, uchar satU, uchar valL = VAL_L, uchar valU = VAL_U);
+void processPicture();
 
 inline CvPoint getCenter(CBlob blob);
 inline float angleOfBot(Bot* bot);
 void printBlobArea(CBlobResult blob);
 void printBotParams();
 
+void getClosestBall(Bot* bot);
+void moveBot(Bot* bot);
 // Serial Port functions
 extern "C"
 {

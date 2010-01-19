@@ -14,20 +14,60 @@ In each frame:
 			if size(lines) = 0, callRRT
 			else check next node
 					if obstructed run RRT
-					if last node && close to ball, state->CAPTURE
-		CAPTURE:
-			dribblerState -> on
+		        	if close to the ball
+                        dribblerState -> on
+					if last node && reached ball, state->CAPTURED
+                
+        CAPTURED:
+            if captured ball, state->MOVE2GOAL
+			currDest->goal
 			
 		MOVE2GOAL:
-			currDest->goal
 			if size(lines) = 0, callRRT
 			speed -> slowspeed
 			else check next node
 				if obstructed run RRT
-				if last node && close to ball, state->CAPTURE
-		
+				if penultimate node, state->SHOOT
+
+        SHOOT:
+		    speed -> max_speed
+            if close to goal
+                reverse dribbler
+                state -> IDLE
 			
 		
+        call moveToPoint
 			
-			
-			
+
+
+Still to write:
+        
+
+moveToPoint 
+    
+    check if 
+        on a node
+            updates the currentNodeIndex
+            calculate angleDest
+            control(angle)
+
+        between 2 nodes
+            calculate distanceToGo
+            control(distance, state, dribblerState)
+            
+
+            
+control(bool isTurn, float error)
+    if turn,
+        run turn control
+    if not turn,
+        run straight pwm depending on state + dribblerState
+
+    sendMotroCommands()
+        
+    
+
+sendMotorCOmmands
+        sends the pwm values for each motor
+
+getClosestBall

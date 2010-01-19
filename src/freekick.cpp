@@ -1,5 +1,7 @@
 #include "freekick.h"
 
+#define USE_CAMERA  (1)
+
 // Display variables for segmented image
 CvScalar white = CV_RGB(255, 255, 255);
 CvScalar green = CV_RGB(0, 255, 0);
@@ -70,12 +72,13 @@ int main()
     getBots();
     getGoals();
 
-    cvNamedWindow("old", 1);
+    cvNamedWindow("video", 1);
     cvNamedWindow("seg", 1);
-    cvMoveWindow("old", 0,0);
+
+    cvMoveWindow("video", 0,0);
     cvMoveWindow("seg", 0,400);
 
-
+    /*
     CvPoint temp;
     set(&temp, 550, 240);
     cout<<"temp: "<<temp.x<<" "<<temp.y<<endl;
@@ -83,70 +86,105 @@ int main()
     set(&(ourBot[WHITE]->currentDest), 550, 240);
     cout<<"Destination: "<<ourBot[WHITE]->currentDest.x<<" "<<ourBot[WHITE]->currentDest.y<<endl;
     RRTPlan(ourBot[WHITE]);
-    //smoothenRRTPath(total_nodes);
     drawPath(ourBot[WHITE], blobsImg, green);
-
-    cvShowImage("old", image);
+    
+    cvShowImage("video", image);
     cvShowImage("seg", blobsImg);
 
     cvWaitKey();
-    
-
-
-
-
-    /*
-    CvPoint closestBall;
-
-    while(nBallsPresent)
-    {
-        switch(ourBot[WHITE]->state)
-        {
-            case (IDLE):
-                getClosestBall(ourBot[WHITE]);
-                break;
-            case (MOVE):
-                total_nodes = RRTPlan(ourBot[WHITE]->center, closestBall, WHITE);
-                smoothenRRTPath(total_nodes);
-                moveToPoint(ourBot[WHITE]);
-                
-
-
-        //Bot1
-        
-        
-        
-        //Bot2
-
-
-    }
     */
 
-
-
-    /*
-    cvNamedWindow("newImage", 0);
-    IplImage* newImage = cvCreateImage(cvSize(IMAGE_WIDTH,IMAGE_HEIGHT), 8, 3);
+#if USE_CAMERA
+    
     videoInput vin;
     vin.setupDevice(0, IMAGE_WIDTH, IMAGE_HEIGHT);
     CvVideoWriter *writer = 0;
     writer=cvCreateVideoWriter("out.avi", CV_FOURCC_DEFAULT, 5 ,cvSize(IMAGE_WIDTH,frameH), 1);
-    for(int i=0; i<1000; i++)
+
+    while(nBallsPresent)
     {
-        vin.getPixels(0, (unsigned char*)newImage->imageData, 0, 1);
-        cvShowImage("newImage", newImage);
-        cvWriteFrame(writer, newImage);
-        cvWaitKey(20);
+        vin.getPixels(0, (unsigned char*)image->imageData, 0, 1);
+        cvShowImage("video", image);
+        cvWriteFrame(writer, image);
+
+        processPicture();
+        cvShowImage("seg", blobsImg);
+        
+        for(int i=0; i<2; i++)
+        {
+            switch(ourBot[i]->state)
+            {
+                case IDLE:
+                    getNearestBall(ourBot[i]);
+                    ourBot[i]->state = MOVE_TO_BALL;
+
+                case MOVE_TO_BALL:
+                    if (ourBot[i]->currentPath.size() == 0)
+                        RRTPlan(ourBot[i]);
+                    else
+                    {
+                        if(lineIsObstructed(ourBot[i]->center, ourBot[i]->currentPath[currentNodeIndex+1]))
+                            RRTPlan(ourBot[i]);
+
+                        if (dist (ourBot[i]->center, balls[ourBot[i]->ballIndex]) < DRIBBLER_START_DIST)
+                            ourBot[i]->dribblerState = DRIBBLER_IN;
+
+                        if ( (dist (ourBot[i]->center, balls[ourBot[i]->ballIndex]) < BALL_CAPTURE_DIST) \
+                                && (ourBot[i]->currentNodeIndex == (currentPath.size() - 2)) )
+                            ourBot[i]->state = CAPTURED;
+
+                    }
+                    break;
+
+                case CAPTURED:
+                    if(ourColor == RED)
+                        set(&(ourBot[i]->currentDest), GOAL_LEFT_CENTER_X, GOAL_LEFT_CENTER_Y);
+                    else
+                        set(&(ourBot[i]->currentDest), GOAL_RIGHT_CENTER_X, GOAL_RIGHT_CENTER_Y);
+
+                    ourBot[i]->state = MOVE_TO_GOAL;
+                    break;
+
+                case MOVE_TO_GOAL:
+                    if (ourBot[i]->currentPath.size() == 0)
+                        RRTPlan(ourBot[i]);
+                    else
+                    {
+                        if(lineIsObstructed(ourBot[i]->center, ourBot[i]->currentPath[currentNodeIndex+1]))
+                            RRTPlan(ourBot[i]);
+
+                        if (ourBot[i]->currentNodeIndex == (currentPath.size() - 2))
+                            ourBot[i]->state = SHOOT; 
+                    }
+                    break;
+
+                case SHOOT:
+
+                    if (dist (ourBot[i]->center, balls[ourBot[i]->ballIndex]) < SHOOT_DIST)
+                    {
+                        ourBot[i]->dribblerState = DRIBBLER_OUT;
+                    }
+                    if (dist (ourBot[i]->center, balls[ourBot[i]->ballIndex]) > BALL_CAPTURE_DIST)
+                    {
+                        ourBot[i]->dribblerState = DRIBBLER_OFF;
+                        ourBot[i]->state = IDLE;
+                    }
+                    break;
+            };
+            moveToPoint(ourBot[i]);
+        }
+
+        cvWaitKey(1);
     }
     cvReleaseVideoWriter(&writer);
     vin.stopDevice(0);
-    */
 
+#endif
 
     return 0;
 }
 
-void getPicture()
+void processPicture()
 {
 	getGoals();
 	getBots();
@@ -542,17 +580,17 @@ void drawBlobs(CBlobResult blobs, IplImage* img, CvScalar color)
     }
 }
 
-void drawPath(Bot* ourbot, IplImage* img, CvScalar color)
+void drawPath(Bot* bot, IplImage* img, CvScalar color)
 {
 
-    if(ourbot->currentPath.size() == 0)
+    if(bot->currentPath.size() == 0)
     {
         return;
     }
     
-    for (int i = 0; i < ourbot->currentPath.size()-1; i++)
+    for (int i = 0; i < bot->currentPath.size()-1; i++)
     {
-        cvLine(img, ourbot->currentPath[i], ourbot->currentPath[i+1], color);
+        cvLine(img, bot->currentPath[i], bot->currentPath[i+1], color);
     }
 }
 
@@ -672,18 +710,18 @@ void writeObstacles(void)
     }
 };
 
-unsigned int RRTPlan(Bot* ourbot)
+unsigned int RRTPlan(Bot* bot)
 {
     CvPointNode nearest;
     CvPoint extended, target, goal;
 
-    nearest.point = ourbot->center;
-    goal = ourbot->currentDest;
+    nearest.point = bot->center;
+    goal = bot->currentDest;
 
 
     unsigned int i = 0;
     // The first point in the path is the starting point
-    path[0].point = ourbot->center;
+    path[0].point = bot->center;
     path[0].parentIndex = 0;
     i = 1;
     while( (dist(nearest.point, goal) > THRESHOLD) && (i < MAX_NODES) )
@@ -693,7 +731,7 @@ unsigned int RRTPlan(Bot* ourbot)
         fprintf(stderr, "Got target: (%d, %d)\n", target.x, target.y);
 #endif
         nearest = Nearest(target, i);
-        extended = Extend(nearest.point, target, ourbot);
+        extended = Extend(nearest.point, target, bot);
         if ( (extended.x != Empty.x) || (extended.y != Empty.y))
         {
             path[i].point = extended;
@@ -716,8 +754,8 @@ unsigned int RRTPlan(Bot* ourbot)
    
     //startPoint.x = path[0].point.x; startPoint.y = path[0].point.y;
     printf("%d, %d\n", startPoint.x, startPoint.y);
-    ourbot->currentPath.clear();
-    ourbot->currentPath.push_back(startPoint);
+    bot->currentPath.clear();
+    bot->currentPath.push_back(startPoint);
     bool done = false;
     while(!done)
     {
@@ -735,7 +773,7 @@ unsigned int RRTPlan(Bot* ourbot)
         {
             startPoint = endPoint;
             printf("%d, %d\n", startPoint.x, startPoint.y);
-            ourbot->currentPath.push_back(startPoint);
+            bot->currentPath.push_back(startPoint);
             i = num_nodes - 1;
             if((startPoint.x == path[num_nodes - 1].point.x) && (startPoint.y == path[num_nodes - 1].point.y))
                 done = true;
@@ -743,12 +781,13 @@ unsigned int RRTPlan(Bot* ourbot)
     }
     printf("LinesDone\n");
 
+    bot->currentNodeIndex = 0;
     return num_nodes;
 }
 
 
 
-CvPoint Extend(CvPoint nearest, CvPoint target, Bot* ourbot)
+CvPoint Extend(CvPoint nearest, CvPoint target, Bot* bot)
 {
     CvPoint extended = Empty;
     unsigned int distance = (unsigned int) dist(nearest, target);
@@ -764,7 +803,7 @@ CvPoint Extend(CvPoint nearest, CvPoint target, Bot* ourbot)
 #endif
     }
 
-    if ( isObstructed(extended, ourbot) )
+    if ( isObstructed(extended, bot) )
     {
 #ifdef VERBOSE
         fprintf(stderr, "Collision: (%d, %d)\n", extended.x, extended.y);
@@ -795,7 +834,7 @@ CvPointNode Nearest(CvPoint target, unsigned int num_nodes)
     return nearest;
 }
 
-bool isObstructed(CvPoint p, Bot* ourbot)
+bool isObstructed(CvPoint p, Bot* bot)
 {
     int i;
     int retFlag = 0;
@@ -817,7 +856,7 @@ bool isObstructed(CvPoint p, Bot* ourbot)
         }
     }
     //if(botColor == WHITE)
-    if(ourbot == ourBot[WHITE])
+    if(bot == ourBot[WHITE])
     {
         if(dist(ourBot[BLACK]->center, p) < (2*ROBOT_RADIUS) ) 
         {
@@ -825,12 +864,22 @@ bool isObstructed(CvPoint p, Bot* ourbot)
         }
     }
     //else if(botColor == BLACK)
-    else if(ourbot == ourBot[BLACK])
+    else if(bot == ourBot[BLACK])
     {
         if(dist(ourBot[WHITE]->center, p) < (2*ROBOT_RADIUS) ) 
         {
             retFlag  = 1;
         }
+    }
+    if(ourColor == RED)
+    {
+        if( (bot->currentDest.x == GOAL_LEFT_CENTER_X) && (bot->currentDest.y == GOAL_LEFT_CENTER_Y) )
+            return retFlag;
+    }
+    else
+    {
+        if( (bot->currentDest.x == GOAL_RIGHT_CENTER_X) && (bot->currentDest.y == GOAL_RIGHT_CENTER_Y) )
+            return retFlag;
     }
 
     if(  ( p.x <= (DEE_LEFT_NORTH_X + ROBOT_RADIUS)  ))// || (p.x >= (DEE_RIGHT_NORTH_X - ROBOT_RADIUS)) ))
@@ -915,3 +964,28 @@ int lineHitsObstacles(CvPoint start, CvPoint end)
 
     return 0;
 }
+
+void getClosestBall(Bot* bot)
+{
+    float distanceToBall = OUR_INF;
+    float nearestBallIndex = 0;
+    for (int i = 0; i<TOT_BALLS; i++)
+    {
+        float tempDistance = dist(balls[i], bot->center); 
+        if (tempDistance < distanceToBall)
+        {
+            nearestBallIndex = i;
+            distanceToBall = tempDistance; 
+        }
+    }
+    bot->ballIndex = nearestBallIndex;
+}
+
+void moveBot(Bot *bot)
+{
+
+
+
+}
+
+
