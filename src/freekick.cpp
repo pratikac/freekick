@@ -31,7 +31,7 @@ int closestBallIndex = 0;
 
 // RRT vars
 CvPoint Empty;
-CvPointNode     path[MAX_NODES];
+CvPointNode     path[RRT_MAX_NODES];
 int             numObstacles = 6;
 bool            getObstacles = true;
 vector<CvPoint> lines;
@@ -99,7 +99,7 @@ int main()
     videoInput vin;
     vin.setupDevice(0, IMAGE_WIDTH, IMAGE_HEIGHT);
     CvVideoWriter *writer = 0;
-    writer=cvCreateVideoWriter("out.avi", CV_FOURCC_DEFAULT, 5 ,cvSize(IMAGE_WIDTH,frameH), 1);
+    writer=cvCreateVideoWriter("out.avi", CV_FOURCC_DEFAULT, 5 ,cvSize(IMAGE_WIDTH,IMAGE_HEIGHT), 1);
 
     while(nBallsPresent)
     {
@@ -115,7 +115,7 @@ int main()
             switch(ourBot[i]->state)
             {
                 case IDLE:
-                    getNearestBall(ourBot[i]);
+                    getClosestBall(ourBot[i]);
                     ourBot[i]->state = MOVE_TO_BALL;
 
                 case MOVE_TO_BALL:
@@ -123,14 +123,14 @@ int main()
                         RRTPlan(ourBot[i]);
                     else
                     {
-                        if(lineIsObstructed(ourBot[i]->center, ourBot[i]->currentPath[currentNodeIndex+1]))
+                        if(lineHitsObstacles(ourBot[i]->center, ourBot[i]->currentPath[ourBot[i]->currentNodeIndex+1]))
                             RRTPlan(ourBot[i]);
 
                         if (dist (ourBot[i]->center, balls[ourBot[i]->ballIndex]) < DRIBBLER_START_DIST)
                             ourBot[i]->dribblerState = DRIBBLER_IN;
 
                         if ( (dist (ourBot[i]->center, balls[ourBot[i]->ballIndex]) < BALL_CAPTURE_DIST) \
-                                && (ourBot[i]->currentNodeIndex == (currentPath.size() - 2)) )
+                                && (ourBot[i]->currentNodeIndex == (ourBot[i]->currentPath.size() - 2)) )
                             ourBot[i]->state = CAPTURED;
 
                     }
@@ -150,20 +150,31 @@ int main()
                         RRTPlan(ourBot[i]);
                     else
                     {
-                        if(lineIsObstructed(ourBot[i]->center, ourBot[i]->currentPath[currentNodeIndex+1]))
+                        if(lineHitsObstacles(ourBot[i]->center, ourBot[i]->currentPath[ourBot[i]->currentNodeIndex+1]))
                             RRTPlan(ourBot[i]);
 
-                        if (ourBot[i]->currentNodeIndex == (currentPath.size() - 2))
+                        if (ourBot[i]->currentNodeIndex == (ourBot[i]->currentPath.size() - 2))
                             ourBot[i]->state = SHOOT; 
                     }
                     break;
 
                 case SHOOT:
 
-                    if (dist (ourBot[i]->center, balls[ourBot[i]->ballIndex]) < SHOOT_DIST)
+                    if (ourColor == BLUE)
                     {
-                        ourBot[i]->dribblerState = DRIBBLER_OUT;
+                        if (ourBot[i]->center.x > DEE_RIGHT_NORTH_X - SHOOT_DIST)
+                        {
+                            ourBot[i]->dribblerState = DRIBBLER_OUT;
+                        }
                     }
+                    else if (ourColor == RED)
+                    {
+                        if (ourBot[i]->center.x < DEE_RIGHT_NORTH_X + SHOOT_DIST)
+                        {
+                            ourBot[i]->dribblerState = DRIBBLER_OUT;
+                        }
+                    }
+
                     if (dist (ourBot[i]->center, balls[ourBot[i]->ballIndex]) > BALL_CAPTURE_DIST)
                     {
                         ourBot[i]->dribblerState = DRIBBLER_OFF;
@@ -171,7 +182,8 @@ int main()
                     }
                     break;
             };
-            moveToPoint(ourBot[i]);
+            getBotMove(ourBot[i]);
+            sendBotMove(ourBot[i]);
         }
 
         cvWaitKey(1);
@@ -588,7 +600,7 @@ void drawPath(Bot* bot, IplImage* img, CvScalar color)
         return;
     }
     
-    for (int i = 0; i < bot->currentPath.size()-1; i++)
+    for (unsigned int i = 0; i < bot->currentPath.size()-1; i++)
     {
         cvLine(img, bot->currentPath[i], bot->currentPath[i+1], color);
     }
@@ -647,7 +659,14 @@ inline CvPoint getCenter(CBlob blob)
 
 inline float angleOfBot(Bot* bot)
 {
-    return (float)(180 / (CV_PI) * atan2((float)(bot->center.y - bot->circleCenter.y), (float)(bot->circleCenter.x - bot->center.x)));
+    float tempAngle;
+    // atan2 returns angle between -180 and 180
+    tempAngle =  (float)(180 / (CV_PI) * atan2((float)(bot->center.y - bot->circleCenter.y), (float)(bot->circleCenter.x - bot->center.x)));
+    // We return an angle between 0 and 360
+    if (tempAngle < 0) 
+        return tempAngle + 360;
+    else 
+        return tempAngle;
 }
 
 void printBlobArea(CBlobResult blob)
@@ -678,11 +697,11 @@ void writeObstacles(void)
     // write obs[] array
     obs[OBS_D_L].center.x = -IMAGE_WIDTH/2;
     obs[OBS_D_L].center.y = 0;
-    obs[OBS_D_L].radius = 400/SCALE_FACTOR + ROBOT_RADIUS;
+    obs[OBS_D_L].radius = (int)(400/SCALE_FACTOR + ROBOT_RADIUS);
     
     obs[OBS_D_R].center.x = IMAGE_WIDTH/2;
     obs[OBS_D_R].center.y = 0;
-    obs[OBS_D_R].radius = 400/SCALE_FACTOR + ROBOT_RADIUS;
+    obs[OBS_D_R].radius = (int)(400/SCALE_FACTOR + ROBOT_RADIUS);
     
     if(ourColor == RED)
     {
@@ -724,7 +743,7 @@ unsigned int RRTPlan(Bot* bot)
     path[0].point = bot->center;
     path[0].parentIndex = 0;
     i = 1;
-    while( (dist(nearest.point, goal) > THRESHOLD) && (i < MAX_NODES) )
+    while( (dist(nearest.point, goal) > RRT_THRESHOLD) && (i < RRT_MAX_NODES) )
     {
         target = getCurrentTarget(goal);
 #ifdef VERBOSE
@@ -740,8 +759,8 @@ unsigned int RRTPlan(Bot* bot)
         }
     }
 #ifdef VERBOSE
-    if( i == MAX_NODES)
-        fprintf(stderr, "MAX_NODES REACHED!\n");
+    if( i == RRT_MAX_NODES)
+        fprintf(stderr, "RRT_MAX_NODES REACHED!\n");
 #endif
     //return i;
     int num_nodes = i;
@@ -749,7 +768,7 @@ unsigned int RRTPlan(Bot* bot)
     
     // HERE IS WHERE WE SMOOTH THE PATH OBTAINED 
     i = num_nodes -1;
-    CvPoint prevPoint, startPoint, endPoint;
+    CvPoint startPoint, endPoint;
     startPoint = path[0].point;
    
     //startPoint.x = path[0].point.x; startPoint.y = path[0].point.y;
@@ -791,12 +810,12 @@ CvPoint Extend(CvPoint nearest, CvPoint target, Bot* bot)
 {
     CvPoint extended = Empty;
     unsigned int distance = (unsigned int) dist(nearest, target);
-    if ( distance < EXTEND_DIST )
+    if ( distance < RRT_EXTEND_DIST )
         extended = target;
     else
     {
-        extended.x = (int)(nearest.x + (float)(target.x - nearest.x)*EXTEND_DIST/distance);
-        extended.y = (int)(nearest.y + (float)(target.y - nearest.y)*EXTEND_DIST/distance);
+        extended.x = (int)(nearest.x + (float)(target.x - nearest.x)*RRT_EXTEND_DIST/distance);
+        extended.y = (int)(nearest.y + (float)(target.y - nearest.y)*RRT_EXTEND_DIST/distance);
 #ifdef VERBOSE
         fprintf(stderr, "nearest: (%d, %d), target: (%d, %d), extended: (%d, %d)\n",
                 nearest.x, nearest.y, target.x, target.y, extended.x, extended.y);
@@ -947,7 +966,7 @@ int lineHitsObstacles(CvPoint start, CvPoint end)
 #ifdef VERBOSE
         fprintf(stderr, "projected: (%f, %f), dist: %f\n", xp, yp, obsDist);
 #endif
-        if( obsDist + EPSILON <  (obs[i].radius + ROBOT_RADIUS))
+        if( obsDist + RRT_OBSTACLE_CLEARANCE <  (obs[i].radius + ROBOT_RADIUS))
         {
             dotProduct = (start.x - xp)*(end.x - xp)\
                          + (start.y - yp)*(end.y - yp);
@@ -968,7 +987,7 @@ int lineHitsObstacles(CvPoint start, CvPoint end)
 void getClosestBall(Bot* bot)
 {
     float distanceToBall = OUR_INF;
-    float nearestBallIndex = 0;
+    unsigned int nearestBallIndex = 0;
     for (int i = 0; i<TOT_BALLS; i++)
     {
         float tempDistance = dist(balls[i], bot->center); 
@@ -981,11 +1000,140 @@ void getClosestBall(Bot* bot)
     bot->ballIndex = nearestBallIndex;
 }
 
-void moveBot(Bot *bot)
+void getBotMove(Bot *bot)
 {
+    float error;
+    float tempAngle;
+    unsigned char meanSpeed = 0;
+
+    if ((bot->state == IDLE) || (bot->state == CAPTURED))
+    {
+        bot->lMotorPWM = 0;
+        bot->rMotorPWM = 0;
+        return;
+    }
+
+    // Check if a turn is required at the start of a new path
+    if ( (bot->currentNodeIndex == 0) && (dist(bot->center, bot->currentPath[0]) < NEXT_NODE_DIST) )
+    {
+            tempAngle = atan2(bot->currentPath[1].y - bot->center.y, bot->currentPath[1].x - bot->center.x);
+            bot->angleDest = ( (tempAngle > 0) ? tempAngle : (tempAngle + 360));
+
+            bot->inTurn = (ABS(bot->angleDest - bot->angle) < ANGLE_TOLERANCE);
+    }
+        
+    // Takes care of all the actual movement
+
+    if (bot->inTurn)    // IF in a turn
+    {
+
+        // Get the adjusted error with direction
+        error = bot->angleDest - bot->angle;    
+        if (error > 180)
+            error = error - 360;
+
+        // If the error is small enough, stop the turn
+        if(ABS(error) < ANGLE_TOLERANCE)
+        {
+            bot->inTurn = false;
+            bot->lMotorPWM = 0;
+            bot->rMotorPWM = 0;
+            bot->lMotorDIR = FORWARD;
+            bot->rMotorDIR = FORWARD;
+            return;
+        }
+        
+
+        // If you have the ball, turn slower
+        if(bot->state == MOVE_TO_GOAL)
+            meanSpeed = (unsigned char) (WITH_BALL_FACTOR * TURN_SPEED); 
+
+        // Control the direction
+        if (error > 0)
+        {
+            bot->lMotorDIR = BACKWARD;
+            bot->rMotorDIR = FORWARD;
+        }
+        else
+        {
+            bot->lMotorDIR = FORWARD;
+            bot->rMotorDIR = BACKWARD;
+        }
+
+        // Control the speed
+        bot->lMotorPWM = meanSpeed;
+        bot->rMotorPWM = meanSpeed;
+        
+    }
 
 
+    else    // IF moving in a straight line
+    {
+        error = dist(bot->currentPath[bot->currentNodeIndex + 1], bot->center);
+
+        //IF at end of line (i.e at next node)
+        if (error < NEXT_NODE_DIST)
+        {
+            bot->currentNodeIndex++;
+            // Stop the bot
+            bot->lMotorPWM = 0;
+            bot->rMotorPWM = 0;
+
+            // ANYTHING TO DO IF THIS IS THE LAST NODE ?? in SHOOT or MOVE ?
+            if (bot->currentNodeIndex == bot->currentPath.size() - 1)
+                return;
+
+            //Set up the turn
+            bot->inTurn = true;
+            
+            //Get angleDest:
+            tempAngle = atan2(bot->currentPath[bot->currentNodeIndex].y - bot->center.y, bot->currentPath[bot->currentNodeIndex].x - bot->center.x);
+            bot->angleDest = ( (tempAngle > 0) ? tempAngle: (tempAngle + 360));
+
+            return;
+        }
+
+        else    //If in the middle of a line
+        {
+
+            // Pick mean speed according to state
+            switch(bot->state)
+            {
+                case MOVE_TO_BALL:
+                    meanSpeed = STRAIGHT_SPEED;
+                    break;
+
+                case MOVE_TO_GOAL:
+                    meanSpeed = (unsigned char) (WITH_BALL_FACTOR * STRAIGHT_SPEED);
+                    break;
+
+                case SHOOT:
+                    meanSpeed = MAX_SPEED;
+                    break;
+            };
+
+            // Control the Speed;
+            bot->lMotorPWM = meanSpeed;
+            bot->rMotorPWM = meanSpeed;
+            return;
+        }
+    }
 
 }
+
+void sendBotMove(Bot* bot)
+{
+    unsigned char command[4] = {0};
+    // command: label_of_bot lMotorPWM rMotorPWM flag+tail
+    // pattern of last byte: lMotorDIR rMotorDIR dribblerON dribblerDIR first4bytes_of_label 
+
+    command[0] = ( (bot == ourBot[WHITE])? WHITE_TAG : BLACK_TAG ); 
+    command[1] = bot->lMotorPWM;
+    command[2] = bot->rMotorPWM;
+    command[3] = bot->lMotorDIR<<7 | bot->rMotorDIR<<6 | bot->dribblerState<<4 | command[0]>>4;
+
+   //!!! WRITE THE XBEE / SERIAL PORT COMMANDS HERE !!! 
+}
+
 
 
